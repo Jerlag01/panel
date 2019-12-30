@@ -25,7 +25,7 @@ class DatabaseRepository extends EloquentRepository implements DatabaseRepositor
     /**
      * DatabaseRepository constructor.
      *
-     * @param \Illuminate\Foundation\Application   $application
+     * @param \Illuminate\Foundation\Application $application
      * @param \Illuminate\Database\DatabaseManager $database
      */
     public function __construct(Application $application, DatabaseManager $database)
@@ -76,7 +76,7 @@ class DatabaseRepository extends EloquentRepository implements DatabaseRepositor
      */
     public function getDatabasesForServer(int $server): Collection
     {
-        return $this->getBuilder()->where('server_id', $server)->get($this->getColumns());
+        return $this->getBuilder()->with('host')->where('server_id', $server)->get($this->getColumns());
     }
 
     /**
@@ -153,7 +153,7 @@ class DatabaseRepository extends EloquentRepository implements DatabaseRepositor
     public function assignUserToDatabase(string $database, string $username, string $remote): bool
     {
         return $this->run(sprintf(
-            'GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, INDEX, EXECUTE ON `%s`.* TO `%s`@`%s`',
+            'GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, INDEX, LOCK TABLES, EXECUTE ON `%s`.* TO `%s`@`%s`',
             $database,
             $username,
             $remote

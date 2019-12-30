@@ -4,34 +4,26 @@ namespace Pterodactyl\Http\Controllers\Api\Client\Servers;
 
 use Illuminate\Http\Response;
 use Pterodactyl\Models\Server;
-use Pterodactyl\Services\DaemonKeys\DaemonKeyProviderService;
+use Pterodactyl\Repositories\Wings\DaemonPowerRepository;
 use Pterodactyl\Http\Controllers\Api\Client\ClientApiController;
 use Pterodactyl\Http\Requests\Api\Client\Servers\SendPowerRequest;
-use Pterodactyl\Contracts\Repository\Daemon\PowerRepositoryInterface;
 
 class PowerController extends ClientApiController
 {
     /**
-     * @var \Pterodactyl\Services\DaemonKeys\DaemonKeyProviderService
-     */
-    private $keyProviderService;
-
-    /**
-     * @var \Pterodactyl\Contracts\Repository\Daemon\PowerRepositoryInterface
+     * @var \Pterodactyl\Repositories\Wings\DaemonPowerRepository
      */
     private $repository;
 
     /**
      * PowerController constructor.
      *
-     * @param \Pterodactyl\Services\DaemonKeys\DaemonKeyProviderService         $keyProviderService
-     * @param \Pterodactyl\Contracts\Repository\Daemon\PowerRepositoryInterface $repository
+     * @param \Pterodactyl\Repositories\Wings\DaemonPowerRepository $repository
      */
-    public function __construct(DaemonKeyProviderService $keyProviderService, PowerRepositoryInterface $repository)
+    public function __construct(DaemonPowerRepository $repository)
     {
         parent::__construct();
 
-        $this->keyProviderService = $keyProviderService;
         $this->repository = $repository;
     }
 
@@ -39,18 +31,14 @@ class PowerController extends ClientApiController
      * Send a power action to a server.
      *
      * @param \Pterodactyl\Http\Requests\Api\Client\Servers\SendPowerRequest $request
+     * @param \Pterodactyl\Models\Server $server
      * @return \Illuminate\Http\Response
-     *
-     * @throws \Pterodactyl\Exceptions\Model\DataValidationException
-     * @throws \Pterodactyl\Exceptions\Repository\RecordNotFoundException
-     * @throws \Pterodactyl\Exceptions\Repository\Daemon\InvalidPowerSignalException
      */
-    public function index(SendPowerRequest $request): Response
+    public function index(SendPowerRequest $request, Server $server): Response
     {
-        $server = $request->getModel(Server::class);
-        $token = $this->keyProviderService->handle($server, $request->user());
-
-        $this->repository->setServer($server)->setToken($token)->sendSignal($request->input('signal'));
+        $this->repository->setServer($server)->send(
+            $request->input('signal')
+        );
 
         return $this->returnNoContent();
     }

@@ -3,6 +3,118 @@ This file is a running track of new features and fixes to each version of the pa
 
 This project follows [Semantic Versioning](http://semver.org) guidelines.
 
+## v0.7.16 (Derelict Dermodactylus)
+### Fixed
+* Fixed the /api/application/servers endpoint erroring when including subusers or egg
+* Fixed bug in migration files causing failures when using MySQL 8.
+* Fixed missing redirect return when an error occurs while modifying database information.
+* Fixes bug in login attempt tracking.
+* Fixes a bug where certain URL encoded files would not be editable in the file manager.
+
+### Added
+* The application API now includes the egg's name in the egg model's response.
+* The /api/application/servers endpoint can now include server's databases and subusers.
+
+## v0.7.15 (Derelict Dermodactylus)
+### Fixed
+* Fixes support for PHP 7.3 when running `composer install` commands due to a dependency that needed updating.
+* Automatic allocation field when creating a new node (or updating one) should now properly remeber its old
+value when showing an error state.
+* Mass deleting files now executes properly and doesn't result in a JS console error.
+* Scrolling on email settings page now works.
+* Database host management will now properly display an error message to the user when there is any type of MySQL related
+error encountered during creation or update.
+* Two-factor tokens generated when a company name has a space in it will now properly be parsed on iOS authenticator devices.
+* Fixed 500 error when trying to request subuser's from a server in the application API.
+* Creating a node allocation via the API no longer requires an alias field be passed through in the request.
+* Bulk power management for servers via the CLI no longer fails when servers span multiple nodes.
+
+### Added
+* Server listing view now displays the total used disk space for each server.
+* Client API endpoint to list all servers now supports an additional `?filter=subuser-of|all|admin|owner` parameter to
+return different groupings of servers. The default value is `subuser-of` which will include all of the user's servers
+that they are the owner of, as well as all servers they're a subuser of.
+* Added back ability to toggle OOM killer status on a per-server basis.
+* Added `LOCK TABLES` permission for generated database users.
+
+### Changed
+* Updated Paper egg to not download `server.properties` each time. [parkervcp/eggs#260](https://github.com/parkervcp/eggs/issues/260)
+* Insurgency egg now uses the proper dedicated server ID.
+* Teamspeak egg updated with improved installation process and grabbing latest versions.
+* OOM killer disabled by default on all new servers.
+* Passwords generated for MySQL now include special characters and are 24 characters in length.
+
+## v0.7.14 (Derelict Dermodactylus)
+### Fixed
+* **[SECURITY]** Fixes an XSS vulnerability when performing certain actions in the file manager.
+* **[SECURITY]** Attempting to login as a user who has 2FA enabled will no longer request the 2FA token before validating
+that their password is correct. This closes a user existence leak that would expose that an account exists if
+it had 2FA enabled.
+
+### Changed
+* Support for setting a node to listen on ports lower than 1024.
+* QR code URLs are now generated without the use of an external library to reduce the dependency tree.
+* Regenerated database passwords now respect the same settings that were used when initially created.
+* Cleaned up 2FA QR code generation to use a more up-to-date library and API.
+* Console charts now properly start at 0 and scale based on server configuration. No more crazy spikes that
+are due to a change of one unit.
+
+## v0.7.13 (Derelict Dermodactylus)
+### Fixed
+* Fixes a bug with the location update API endpoint throwing an error due to an unexected response value.
+* Fixes bug where node creation API endpoint was not correctly requiring the `disk_overallocate` key.
+* Prevents an exception from being thrown when a database with the same name is created on two different hosts.
+* Fixes the redis password not saving correctly when setting up the environment from the command line.
+* Fixes a bug with transaction handling in many areas of the application that would cause validation error messages
+and other session data to not be persisted properly when using the database as the session driver.
+* Fix a bug introduced at some point in the past that causes internal data integrity exceptions to not bubble up to
+the user correctly, leading to extraneous and confusing exception messages.
+* Fixes a bug causing servers to not be marked as having failed installation in some cases.
+
+### Changed
+* `allocation_limit` for servers now defaults to a null value, and is not required in PATCH/POST requests when adding
+a server through the API.
+* The `PATCH` endpoint for `/api/applications/servers/{server}/build` now accepts an array called `limits` to match
+the response from the server `GET` endpoint.
+
+### Added
+* The server listing for a node is now paginated to 25 servers per page to improve performance on large nodes.
+
+## v0.7.12 (Derelict Dermodactylus)
+### Fixed
+* Fixes an issue with the locations API endpoint referencing an invalid namespace.
+* Fixes the `store()` function on the locations API not working due to an incorrect return typehint.
+* Fixes daemon secrets not being able to be reset on a Node.
+* Fixes an issue where files were not editable due to missing URL encoding in the file manager.
+* Fixed checking of language changes
+* Fixed Spigot egg not building versions other than `latest`.
+* Fixed the Forge egg install script.
+* Fixes a bug that would ignore the `skip_scripts` setting when creating or editing a server.
+
+### Updated
+* Upgraded core to use Laravel `5.7.14`.
+* Updated Simplified Chinese translation pack.
+
+### Added
+* Added support for opening and editing Python files through the web editor.
+* Adds Russian translation.
+
+## v0.7.11 (Derelict Dermodactylus)
+### Fixed
+* Fixes an issue with certain systems not handling an API folder that was named `API` but referenced as `Api` in the namespace.
+* TS3 egg updated to use CLI arguments correctly and have a more minimalistic installation script.
+* Terminal was not properly displaying longer lines leading to some visual inconsistency.
+* Assorted translation updates.
+* Pagination for server listing now properly respects configuration setting.
+* Client API now properly respects permissions that are set and allows subusers to access their assigned servers.
+
+### Changed
+* Removed PhraseApp integration from Panel code as it is no longer used.
+* SFTP login endpoint now returns the permissions for that user rather than requiring additional queries to get that data.
+
+### Added
+* You can now test your mail settings from the Admin CP without waiting to see if things are working correctly.
+
 ## v0.7.10 (Derelict Dermodactylus)
 ### Fixed
 * Scheduled tasks triggered manually no longer improperly change the `next_run_at` time and do not run twice in a row anymore.
@@ -183,7 +295,7 @@ This project follows [Semantic Versioning](http://semver.org) guidelines.
 * Nest and Egg listings now show the associated ID in order to make API requests easier.
 * Added star indicators to user listing in Admin CP to indicate users who are set as a root admin.
 * Creating a new node will now requires a SSL connection if the Panel is configured to use SSL as well.
-* Socketio error messages due to permissions are now rendered correctly in the UI rather than causing a silent failure.
+* Connector error messages due to permissions are now rendered correctly in the UI rather than causing a silent failure.
 * File manager now supports mass deletion option for files and folders.
 * Support for CS:GO as a default service option selection.
 * Support for GMOD as a default service option selection.
@@ -313,7 +425,7 @@ This project follows [Semantic Versioning](http://semver.org) guidelines.
 * Changed 2FA login process to be more secure. Previously authentication checking happened on the 2FA post page, now it happens prior and is passed along to the 2FA page to avoid storing any credentials.
 
 ### Added
-* Socketio error messages due to permissions are now rendered correctly in the UI rather than causing a silent failure.
+* Connector error messages due to permissions are now rendered correctly in the UI rather than causing a silent failure.
 
 ## v0.7.0-beta.1 (Derelict Dermodactylus)
 ### Added

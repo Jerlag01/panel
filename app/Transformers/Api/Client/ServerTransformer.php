@@ -2,10 +2,17 @@
 
 namespace Pterodactyl\Transformers\Api\Client;
 
+use Pterodactyl\Models\Egg;
 use Pterodactyl\Models\Server;
+use Pterodactyl\Models\Subuser;
 
 class ServerTransformer extends BaseClientTransformer
 {
+    /**
+     * @var array
+     */
+    protected $availableIncludes = ['egg', 'subusers'];
+
     /**
      * @return string
      */
@@ -28,7 +35,16 @@ class ServerTransformer extends BaseClientTransformer
             'identifier' => $server->uuidShort,
             'uuid' => $server->uuid,
             'name' => $server->name,
+            'node' => $server->node->name,
+            'sftp_details' => [
+                'ip' => $server->node->fqdn,
+                'port' => $server->node->daemonSFTP,
+            ],
             'description' => $server->description,
+            'allocation' => [
+                'ip' => $server->allocation->alias,
+                'port' => $server->allocation->port,
+            ],
             'limits' => [
                 'memory' => $server->memory,
                 'swap' => $server->swap,
@@ -41,5 +57,29 @@ class ServerTransformer extends BaseClientTransformer
                 'allocations' => $server->allocation_limit,
             ],
         ];
+    }
+
+    /**
+     * Returns the egg associated with this server.
+     *
+     * @param \Pterodactyl\Models\Server $server
+     * @return \League\Fractal\Resource\Item
+     * @throws \Pterodactyl\Exceptions\Transformer\InvalidTransformerLevelException
+     */
+    public function includeEgg(Server $server)
+    {
+        return $this->item($server->egg, $this->makeTransformer(EggTransformer::class), Egg::RESOURCE_NAME);
+    }
+
+    /**
+     * Returns the subusers associated with this server.
+     *
+     * @param \Pterodactyl\Models\Server $server
+     * @return \League\Fractal\Resource\Collection
+     * @throws \Pterodactyl\Exceptions\Transformer\InvalidTransformerLevelException
+     */
+    public function includeSubusers(Server $server)
+    {
+        return $this->collection($server->subusers, $this->makeTransformer(SubuserTransformer::class), Subuser::RESOURCE_NAME);
     }
 }

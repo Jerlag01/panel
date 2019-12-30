@@ -2,15 +2,11 @@
 
 namespace Pterodactyl\Models;
 
-use Sofa\Eloquence\Eloquence;
-use Sofa\Eloquence\Validable;
-use Illuminate\Database\Eloquent\Model;
-use Sofa\Eloquence\Contracts\CleansAttributes;
-use Sofa\Eloquence\Contracts\Validable as ValidableContract;
+use Pterodactyl\Models\Traits\Searchable;
 
-class Pack extends Model implements CleansAttributes, ValidableContract
+class Pack extends Validable
 {
-    use Eloquence, Validable;
+    use Searchable;
 
     /**
      * The resource name for this model when it is transformed into an
@@ -37,27 +33,14 @@ class Pack extends Model implements CleansAttributes, ValidableContract
     /**
      * @var array
      */
-    protected static $applicationRules = [
-        'name' => 'required',
-        'version' => 'required',
-        'description' => 'sometimes',
-        'selectable' => 'sometimes|required',
-        'visible' => 'sometimes|required',
-        'locked' => 'sometimes|required',
-        'egg_id' => 'required',
-    ];
-
-    /**
-     * @var array
-     */
-    protected static $dataIntegrityRules = [
-        'name' => 'string',
-        'version' => 'string',
-        'description' => 'nullable|string',
-        'selectable' => 'boolean',
-        'visible' => 'boolean',
-        'locked' => 'boolean',
-        'egg_id' => 'exists:eggs,id',
+    public static $validationRules = [
+        'name' => 'required|string',
+        'version' => 'required|string',
+        'description' => 'sometimes|nullable|string',
+        'selectable' => 'sometimes|required|boolean',
+        'visible' => 'sometimes|required|boolean',
+        'locked' => 'sometimes|required|boolean',
+        'egg_id' => 'required|exists:eggs,id',
     ];
 
     /**

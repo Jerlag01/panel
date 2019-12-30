@@ -3,9 +3,9 @@
 namespace Pterodactyl\Repositories\Eloquent;
 
 use Pterodactyl\Models\User;
-use Webmozart\Assert\Assert;
 use Pterodactyl\Models\Server;
 use Illuminate\Support\Collection;
+use Illuminate\Database\Eloquent\Builder;
 use Pterodactyl\Repositories\Concerns\Searchable;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -43,7 +43,7 @@ class ServerRepository extends EloquentRepository implements ServerRepositoryInt
      * Load the egg relations onto the server model.
      *
      * @param \Pterodactyl\Models\Server $server
-     * @param bool                       $refresh
+     * @param bool $refresh
      * @return \Pterodactyl\Models\Server
      */
     public function loadEggRelations(Server $server, bool $refresh = false): Server
@@ -63,6 +63,26 @@ class ServerRepository extends EloquentRepository implements ServerRepositoryInt
      * @return \Illuminate\Support\Collection
      */
     public function getDataForRebuild(int $server = null, int $node = null): Collection
+    {
+        $instance = $this->getBuilder()->with(['allocation', 'allocations', 'pack', 'egg', 'node']);
+
+        if (! is_null($server) && is_null($node)) {
+            $instance = $instance->where('id', '=', $server);
+        } elseif (is_null($server) && ! is_null($node)) {
+            $instance = $instance->where('node_id', '=', $node);
+        }
+
+        return $instance->get($this->getColumns());
+    }
+
+    /**
+     * Return a collection of servers with their associated data for reinstall operations.
+     *
+     * @param int|null $server
+     * @param int|null $node
+     * @return \Illuminate\Support\Collection
+     */
+    public function getDataForReinstall(int $server = null, int $node = null): Collection
     {
         $instance = $this->getBuilder()->with(['allocation', 'allocations', 'pack', 'egg', 'node']);
 
@@ -100,7 +120,7 @@ class ServerRepository extends EloquentRepository implements ServerRepositoryInt
      * return the server from the database.
      *
      * @param \Pterodactyl\Models\Server $server
-     * @param bool                       $refresh
+     * @param bool $refresh
      * @return \Pterodactyl\Models\Server
      */
     public function getPrimaryAllocation(Server $server, bool $refresh = false): Server
@@ -116,7 +136,7 @@ class ServerRepository extends EloquentRepository implements ServerRepositoryInt
      * Return all of the server variables possible and default to the variable
      * default if there is no value defined for the specific server requested.
      *
-     * @param int  $id
+     * @param int $id
      * @param bool $returnAsObject
      * @return array|object
      *
@@ -151,7 +171,7 @@ class ServerRepository extends EloquentRepository implements ServerRepositoryInt
      * Return enough data to be used for the creation of a server via the daemon.
      *
      * @param \Pterodactyl\Models\Server $server
-     * @param bool                       $refresh
+     * @param bool $refresh
      * @return \Pterodactyl\Models\Server
      */
     public function getDataForCreation(Server $server, bool $refresh = false): Server
@@ -169,7 +189,7 @@ class ServerRepository extends EloquentRepository implements ServerRepositoryInt
      * Load associated databases onto the server model.
      *
      * @param \Pterodactyl\Models\Server $server
-     * @param bool                       $refresh
+     * @param bool $refresh
      * @return \Pterodactyl\Models\Server
      */
     public function loadDatabaseRelations(Server $server, bool $refresh = false): Server
@@ -187,7 +207,7 @@ class ServerRepository extends EloquentRepository implements ServerRepositoryInt
      * if they are missing, or refresh is set to true.
      *
      * @param \Pterodactyl\Models\Server $server
-     * @param bool                       $refresh
+     * @param bool $refresh
      * @return array
      */
     public function getDaemonServiceData(Server $server, bool $refresh = false): array
@@ -210,11 +230,11 @@ class ServerRepository extends EloquentRepository implements ServerRepositoryInt
      * Return a paginated list of servers that a user can access at a given level.
      *
      * @param \Pterodactyl\Models\User $user
-     * @param int                      $level
-     * @param bool                     $paginate
+     * @param int $level
+     * @param bool|int $paginate
      * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator|\Illuminate\Database\Eloquent\Collection
      */
-    public function filterUserAccessServers(User $user, int $level, bool $paginate = true)
+    public function filterUserAccessServers(User $user, int $level, $paginate = 25)
     {
         $instance = $this->getBuilder()->select($this->getColumns())->with(['user', 'node', 'allocation']);
 
@@ -240,7 +260,7 @@ class ServerRepository extends EloquentRepository implements ServerRepositoryInt
 
         $instance->search($this->getSearchTerm());
 
-        return $paginate ? $instance->paginate(25) : $instance->get();
+        return $paginate ? $instance->paginate($paginate) : $instance->get();
     }
 
     /**
@@ -253,12 +273,16 @@ class ServerRepository extends EloquentRepository implements ServerRepositoryInt
      */
     public function getByUuid(string $uuid): Server
     {
-        Assert::notEmpty($uuid, 'Expected non-empty string as first argument passed to ' . __METHOD__);
-
         try {
-            return $this->getBuilder()->with('nest', 'node')->where(function ($query) use ($uuid) {
-                $query->where('uuidShort', $uuid)->orWhere('uuid', $uuid);
-            })->firstOrFail($this->getColumns());
+            /** @var \Pterodactyl\Models\Server $model */
+            $model = $this->getBuilder()
+                ->with('nest', 'node')
+                ->where(function (Builder $query) use ($uuid) {
+                    $query->where('uuidShort', $uuid)->orWhere('uuid', $uuid);
+                })
+                ->firstOrFail($this->getColumns());
+
+            return $model;
         } catch (ModelNotFoundException $exception) {
             throw new RecordNotFoundException;
         }
@@ -269,8 +293,8 @@ class ServerRepository extends EloquentRepository implements ServerRepositoryInt
      *
      * @param int[] $servers
      * @param int[] $nodes
-     * @param bool  $returnCount
-     * @return int|\Generator
+     * @param bool $returnCount
+     * @return int|\Illuminate\Support\LazyCollection
      */
     public function getServersForPowerAction(array $servers = [], array $nodes = [], bool $returnCount = false)
     {
@@ -337,5 +361,21 @@ class ServerRepository extends EloquentRepository implements ServerRepositoryInt
     public function getSuspendedServersCount(): int
     {
         return $this->getBuilder()->where('suspended', true)->count();
+    }
+
+    /**
+     * Returns all of the servers that exist for a given node in a paginated response.
+     *
+     * @param int $node
+     * @param int $limit
+     *
+     * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
+     */
+    public function loadAllServersForNode(int $node, int $limit): LengthAwarePaginator
+    {
+        return $this->getBuilder()
+            ->with(['user', 'nest', 'egg'])
+            ->where('node_id', '=', $node)
+            ->paginate($limit);
     }
 }

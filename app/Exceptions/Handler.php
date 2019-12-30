@@ -5,7 +5,9 @@ namespace Pterodactyl\Exceptions;
 use Exception;
 use PDOException;
 use Psr\Log\LoggerInterface;
+use Swift_TransportException;
 use Illuminate\Container\Container;
+use Illuminate\Database\Connection;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Session\TokenMismatchException;
 use Illuminate\Validation\ValidationException;
@@ -47,6 +49,7 @@ class Handler extends ExceptionHandler
      */
     protected $cleanStacks = [
         PDOException::class,
+        Swift_TransportException::class,
     ];
 
     /**
@@ -130,13 +133,28 @@ class Handler extends ExceptionHandler
      * Render an exception into an HTTP response.
      *
      * @param \Illuminate\Http\Request $request
-     * @param \Exception               $exception
+     * @param \Exception $exception
      * @return \Symfony\Component\HttpFoundation\Response
      *
      * @throws \Exception
      */
     public function render($request, Exception $exception)
     {
+        $connections = Container::getInstance()->make(Connection::class);
+
+        // If we are currently wrapped up inside a transaction, we will roll all the way
+        // back to the beginning. This needs to happen, otherwise session data does not
+        // get properly persisted.
+        //
+        // This is kind of a hack, and ideally things like this should be handled as
+        // much as possible at the code level, but there are a lot of spots that do a
+        // ton of actions and were written before this bug discovery was made.
+        //
+        // @see https://github.com/pterodactyl/panel/pull/1468
+        if ($connections->transactionLevel()) {
+            $connections->rollBack(0);
+        }
+
         return parent::render($request, $exception);
     }
 
@@ -144,7 +162,7 @@ class Handler extends ExceptionHandler
      * Transform a validation exception into a consistent format to be returned for
      * calls to the API.
      *
-     * @param \Illuminate\Http\Request                   $request
+     * @param \Illuminate\Http\Request $request
      * @param \Illuminate\Validation\ValidationException $exception
      * @return \Illuminate\Http\JsonResponse
      */
@@ -183,7 +201,7 @@ class Handler extends ExceptionHandler
      * Return the exception as a JSONAPI representation for use on API requests.
      *
      * @param \Exception $exception
-     * @param array      $override
+     * @param array $override
      * @return array
      */
     public static function convertToArray(Exception $exception, array $override = []): array
@@ -224,14 +242,14 @@ class Handler extends ExceptionHandler
     /**
      * Convert an authentication exception into an unauthenticated response.
      *
-     * @param \Illuminate\Http\Request                 $request
+     * @param \Illuminate\Http\Request $request
      * @param \Illuminate\Auth\AuthenticationException $exception
      * @return \Illuminate\Http\Response
      */
     protected function unauthenticated($request, AuthenticationException $exception)
     {
         if ($request->expectsJson()) {
-            return response()->json(['error' => 'Unauthenticated.'], 401);
+            return response()->json(self::convertToArray($exception), 401);
         }
 
         return redirect()->guest(route('auth.login'));

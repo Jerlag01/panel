@@ -6,10 +6,10 @@ use Pterodactyl\Models\Node;
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Exception\RequestException;
 use Illuminate\Database\ConnectionInterface;
+use Pterodactyl\Repositories\Daemon\ConfigurationRepository;
 use Pterodactyl\Contracts\Repository\NodeRepositoryInterface;
 use Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException;
 use Pterodactyl\Exceptions\Service\Node\ConfigurationNotPersistedException;
-use Pterodactyl\Contracts\Repository\Daemon\ConfigurationRepositoryInterface;
 
 class NodeUpdateService
 {
@@ -31,13 +31,13 @@ class NodeUpdateService
     /**
      * UpdateService constructor.
      *
-     * @param \Illuminate\Database\ConnectionInterface                                  $connection
-     * @param \Pterodactyl\Contracts\Repository\Daemon\ConfigurationRepositoryInterface $configurationRepository
-     * @param \Pterodactyl\Contracts\Repository\NodeRepositoryInterface                 $repository
+     * @param \Illuminate\Database\ConnectionInterface $connection
+     * @param \Pterodactyl\Repositories\Daemon\ConfigurationRepository $configurationRepository
+     * @param \Pterodactyl\Contracts\Repository\NodeRepositoryInterface $repository
      */
     public function __construct(
         ConnectionInterface $connection,
-        ConfigurationRepositoryInterface $configurationRepository,
+        ConfigurationRepository $configurationRepository,
         NodeRepositoryInterface $repository
     ) {
         $this->connection = $connection;
@@ -49,25 +49,44 @@ class NodeUpdateService
      * Update the configuration values for a given node on the machine.
      *
      * @param \Pterodactyl\Models\Node $node
-     * @param array                    $data
+     * @param array $data
+     * @param bool $resetToken
+     *
      * @return \Pterodactyl\Models\Node
      *
-     * @throws \Pterodactyl\Exceptions\DisplayException
      * @throws \Pterodactyl\Exceptions\Model\DataValidationException
      * @throws \Pterodactyl\Exceptions\Repository\RecordNotFoundException
+     * @throws \Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException
+     * @throws \Pterodactyl\Exceptions\Service\Node\ConfigurationNotPersistedException
+     *
+     * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    public function handle(Node $node, array $data)
+    public function handle(Node $node, array $data, bool $resetToken = false)
     {
-        if (! is_null(array_get($data, 'reset_secret'))) {
+        if ($resetToken) {
             $data['daemonSecret'] = str_random(Node::DAEMON_SECRET_LENGTH);
-            unset($data['reset_secret']);
         }
 
         $this->connection->beginTransaction();
+
+        /** @var \Pterodactyl\Models\Node $updatedModel */
         $updatedModel = $this->repository->update($node->id, $data);
 
         try {
-            $this->configRepository->setNode($updatedModel)->update();
+            if ($resetToken) {
+                // We need to clone the new model and set it's authentication token to be the
+                // old one so we can connect. Then we will pass the new token through as an
+                // override on the call.
+                $cloned = $updatedModel->replicate(['daemonSecret']);
+                $cloned->setAttribute('daemonSecret', $node->getAttribute('daemonSecret'));
+
+                $this->configRepository->setNode($cloned)->update([
+                    'keys' => [$data['daemonSecret']],
+                ]);
+            } else {
+                $this->configRepository->setNode($updatedModel)->update();
+            }
+
             $this->connection->commit();
         } catch (RequestException $exception) {
             // Failed to connect to the Daemon. Let's go ahead and save the configuration

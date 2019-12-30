@@ -2,16 +2,8 @@
 
 namespace Pterodactyl\Models;
 
-use Sofa\Eloquence\Eloquence;
-use Sofa\Eloquence\Validable;
-use Illuminate\Database\Eloquent\Model;
-use Sofa\Eloquence\Contracts\CleansAttributes;
-use Sofa\Eloquence\Contracts\Validable as ValidableContract;
-
-class Schedule extends Model implements CleansAttributes, ValidableContract
+class Schedule extends Validable
 {
-    use Eloquence, Validable;
-
     /**
      * The resource name for this model when it is transformed into an
      * API representation using fractal.
@@ -81,24 +73,13 @@ class Schedule extends Model implements CleansAttributes, ValidableContract
     /**
      * @var array
      */
-    protected static $applicationRules = [
-        'server_id' => 'required',
-        'cron_day_of_week' => 'required',
-        'cron_day_of_month' => 'required',
-        'cron_hour' => 'required',
-        'cron_minute' => 'required',
-    ];
-
-    /**
-     * @var array
-     */
-    protected static $dataIntegrityRules = [
-        'server_id' => 'exists:servers,id',
+    public static $validationRules = [
+        'server_id' => 'required|exists:servers,id',
         'name' => 'nullable|string|max:255',
-        'cron_day_of_week' => 'string',
-        'cron_day_of_month' => 'string',
-        'cron_hour' => 'string',
-        'cron_minute' => 'string',
+        'cron_day_of_week' => 'required|string',
+        'cron_day_of_month' => 'required|string',
+        'cron_hour' => 'required|string',
+        'cron_minute' => 'required|string',
         'is_active' => 'boolean',
         'is_processing' => 'boolean',
         'last_run_at' => 'nullable|date',

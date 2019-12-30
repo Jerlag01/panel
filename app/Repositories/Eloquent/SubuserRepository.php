@@ -3,6 +3,7 @@
 namespace Pterodactyl\Repositories\Eloquent;
 
 use Pterodactyl\Models\Subuser;
+use Illuminate\Support\Collection;
 use Pterodactyl\Exceptions\Repository\RecordNotFoundException;
 use Pterodactyl\Contracts\Repository\SubuserRepositoryInterface;
 
@@ -19,10 +20,26 @@ class SubuserRepository extends EloquentRepository implements SubuserRepositoryI
     }
 
     /**
+     * Returns the subusers for the given server instance with the associated user
+     * and permission relationships pre-loaded.
+     *
+     * @param int $server
+     * @return \Illuminate\Support\Collection
+     */
+    public function getSubusersForServer(int $server): Collection
+    {
+        return $this->getBuilder()
+            ->with('user', 'permissions')
+            ->where('server_id', $server)
+            ->get()
+            ->toBase();
+    }
+
+    /**
      * Return a subuser with the associated server relationship.
      *
      * @param \Pterodactyl\Models\Subuser $subuser
-     * @param bool                        $refresh
+     * @param bool $refresh
      * @return \Pterodactyl\Models\Subuser
      */
     public function loadServerAndUserRelations(Subuser $subuser, bool $refresh = false): Subuser
@@ -42,7 +59,7 @@ class SubuserRepository extends EloquentRepository implements SubuserRepositoryI
      * Return a subuser with the associated permissions relationship.
      *
      * @param \Pterodactyl\Models\Subuser $subuser
-     * @param bool                        $refresh
+     * @param bool $refresh
      * @return \Pterodactyl\Models\Subuser
      */
     public function getWithPermissions(Subuser $subuser, bool $refresh = false): Subuser

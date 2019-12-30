@@ -73,12 +73,12 @@ class IndexControllerTest extends ControllerTestCase
 
         $this->request->shouldReceive('input')->with('query')->once()->andReturn('searchTerm');
         $this->repository->shouldReceive('setSearchTerm')->with('searchTerm')->once()->andReturnSelf()
-            ->shouldReceive('filterUserAccessServers')->with($model, User::FILTER_LEVEL_ALL)
+            ->shouldReceive('filterUserAccessServers')->with($model, User::FILTER_LEVEL_ALL, config('pterodactyl.paginate.frontend.servers'))
             ->once()->andReturn($paginator);
 
-        $response = $this->controller->getIndex($this->request);
+        $response = $this->controller->index($this->request);
         $this->assertIsViewResponse($response);
-        $this->assertViewNameEquals('base.index', $response);
+        $this->assertViewNameEquals('templates.base.core', $response);
         $this->assertViewHasKey('servers', $response);
         $this->assertViewKeyEquals('servers', $paginator, $response);
     }

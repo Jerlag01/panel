@@ -2,16 +2,11 @@
 
 namespace Pterodactyl\Models;
 
-use Sofa\Eloquence\Eloquence;
-use Sofa\Eloquence\Validable;
-use Illuminate\Database\Eloquent\Model;
 use Znck\Eloquent\Traits\BelongsToThrough;
-use Sofa\Eloquence\Contracts\CleansAttributes;
-use Sofa\Eloquence\Contracts\Validable as ValidableContract;
 
-class Task extends Model implements CleansAttributes, ValidableContract
+class Task extends Validable
 {
-    use BelongsToThrough, Eloquence, Validable;
+    use BelongsToThrough;
 
     /**
      * The resource name for this model when it is transformed into an
@@ -72,23 +67,12 @@ class Task extends Model implements CleansAttributes, ValidableContract
     /**
      * @var array
      */
-    protected static $applicationRules = [
-        'schedule_id' => 'required',
-        'sequence_id' => 'required',
-        'action' => 'required',
-        'payload' => 'required',
-        'time_offset' => 'required',
-    ];
-
-    /**
-     * @var array
-     */
-    protected static $dataIntegrityRules = [
-        'schedule_id' => 'numeric|exists:schedules,id',
-        'sequence_id' => 'numeric|min:1',
-        'action' => 'string',
-        'payload' => 'string',
-        'time_offset' => 'numeric|between:0,900',
+    public static $validationRules = [
+        'schedule_id' => 'required|numeric|exists:schedules,id',
+        'sequence_id' => 'required|numeric|min:1',
+        'action' => 'required|string',
+        'payload' => 'required|string',
+        'time_offset' => 'required|numeric|between:0,900',
         'is_queued' => 'boolean',
     ];
 

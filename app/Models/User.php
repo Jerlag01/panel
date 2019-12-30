@@ -2,33 +2,51 @@
 
 namespace Pterodactyl\Models;
 
-use Sofa\Eloquence\Eloquence;
-use Sofa\Eloquence\Validable;
 use Pterodactyl\Rules\Username;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rules\In;
 use Illuminate\Auth\Authenticatable;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
-use Sofa\Eloquence\Contracts\CleansAttributes;
+use Pterodactyl\Models\Traits\Searchable;
 use Illuminate\Auth\Passwords\CanResetPassword;
 use Pterodactyl\Traits\Helpers\AvailableLanguages;
 use Illuminate\Foundation\Auth\Access\Authorizable;
-use Sofa\Eloquence\Contracts\Validable as ValidableContract;
 use Illuminate\Contracts\Auth\Authenticatable as AuthenticatableContract;
 use Illuminate\Contracts\Auth\Access\Authorizable as AuthorizableContract;
 use Illuminate\Contracts\Auth\CanResetPassword as CanResetPasswordContract;
 use Pterodactyl\Notifications\SendPasswordReset as ResetPasswordNotification;
 
-class User extends Model implements
+/**
+ * @property int $id
+ * @property string|null $external_id
+ * @property string $uuid
+ * @property string $username
+ * @property string $email
+ * @property string|null $name_first
+ * @property string|null $name_last
+ * @property string $password
+ * @property string|null $remeber_token
+ * @property string $language
+ * @property bool $root_admin
+ * @property bool $use_totp
+ * @property string|null $totp_secret
+ * @property \Carbon\Carbon|null $totp_authenticated_at
+ * @property bool $gravatar
+ * @property \Carbon\Carbon $created_at
+ * @property \Carbon\Carbon $updated_at
+ *
+ * @property string $name
+ * @property \Pterodactyl\Models\Permission[]|\Illuminate\Database\Eloquent\Collection $permissions
+ * @property \Pterodactyl\Models\Server[]|\Illuminate\Database\Eloquent\Collection $servers
+ * @property \Pterodactyl\Models\Subuser[]|\Illuminate\Database\Eloquent\Collection $subuserOf
+ * @property \Pterodactyl\Models\DaemonKey[]|\Illuminate\Database\Eloquent\Collection $keys
+ */
+class User extends Validable implements
     AuthenticatableContract,
     AuthorizableContract,
-    CanResetPasswordContract,
-    CleansAttributes,
-    ValidableContract
+    CanResetPasswordContract
 {
-    use Authenticatable, Authorizable, AvailableLanguages, CanResetPassword, Eloquence, Notifiable, Validable {
-        gatherRules as eloquenceGatherRules;
-    }
+    use Authenticatable, Authorizable, AvailableLanguages, CanResetPassword, Notifiable, Searchable;
 
     const USER_LEVEL_USER = 0;
     const USER_LEVEL_ADMIN = 1;
@@ -92,7 +110,7 @@ class User extends Model implements
     /**
      * @var array
      */
-    protected $dates = [self::CREATED_AT, self::UPDATED_AT, 'totp_authenticated_at'];
+    protected $dates = ['totp_authenticated_at'];
 
     /**
      * The attributes excluded from the model's JSON form.
@@ -129,37 +147,20 @@ class User extends Model implements
     ];
 
     /**
-     * Rules verifying that the data passed in forms is valid and meets application logic rules.
-     *
-     * @var array
-     */
-    protected static $applicationRules = [
-        'uuid' => 'required',
-        'email' => 'required',
-        'external_id' => 'sometimes',
-        'username' => 'required',
-        'name_first' => 'required',
-        'name_last' => 'required',
-        'password' => 'sometimes',
-        'language' => 'sometimes',
-        'use_totp' => 'sometimes',
-    ];
-
-    /**
      * Rules verifying that the data being stored matches the expectations of the database.
      *
      * @var array
      */
-    protected static $dataIntegrityRules = [
-        'uuid' => 'string|size:36|unique:users,uuid',
-        'email' => 'email|unique:users,email',
-        'external_id' => 'nullable|string|max:255|unique:users,external_id',
-        'username' => 'between:1,255|unique:users,username',
-        'name_first' => 'string|between:1,255',
-        'name_last' => 'string|between:1,255',
-        'password' => 'nullable|string',
+    public static $validationRules = [
+        'uuid' => 'required|string|size:36|unique:users,uuid',
+        'email' => 'required|email|unique:users,email',
+        'external_id' => 'sometimes|nullable|string|max:255|unique:users,external_id',
+        'username' => 'required|between:1,255|unique:users,username',
+        'name_first' => 'required|string|between:1,255',
+        'name_last' => 'required|string|between:1,255',
+        'password' => 'sometimes|nullable|string',
         'root_admin' => 'boolean',
-        'language' => 'string',
+        'language' => 'required|string',
         'use_totp' => 'boolean',
         'totp_secret' => 'nullable|string',
     ];
@@ -168,13 +169,24 @@ class User extends Model implements
      * Implement language verification by overriding Eloquence's gather
      * rules function.
      */
-    protected static function gatherRules()
+    public static function getRules()
     {
-        $rules = self::eloquenceGatherRules();
+        $rules = parent::getRules();
+
         $rules['language'][] = new In(array_keys((new self)->getAvailableLanguages()));
         $rules['username'][] = new Username;
 
         return $rules;
+    }
+
+    /**
+     * Return the user model in a format that can be passed over to Vue templates.
+     *
+     * @return array
+     */
+    public function toVueObject(): array
+    {
+        return (new Collection($this->toArray()))->except(['id', 'external_id'])->toArray();
     }
 
     /**
@@ -204,7 +216,7 @@ class User extends Model implements
      */
     public function getNameAttribute()
     {
-        return $this->name_first . ' ' . $this->name_last;
+        return trim($this->name_first . ' ' . $this->name_last);
     }
 
     /**

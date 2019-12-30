@@ -2,9 +2,11 @@
 
 return [
     'email' => 'Email',
+    'email_address' => 'Email address',
     'user_identifier' => 'Username or Email',
     'password' => 'Password',
-    'confirm_password' => 'Confirm Password',
+    'new_password' => 'New password',
+    'confirm_password' => 'Confirm new password',
     'login' => 'Login',
     'home' => 'Home',
     'servers' => 'Servers',
@@ -14,6 +16,7 @@ return [
     'connection' => 'Connection',
     'memory' => 'Memory',
     'cpu' => 'CPU',
+    'disk' => 'Disk',
     'status' => 'Status',
     'search' => 'Search',
     'suspended' => 'Suspended',
@@ -85,4 +88,8 @@ return [
         'sat' => 'Saturday',
     ],
     'last_used' => 'Last Used',
+    'enable' => 'Enable',
+    'disable' => 'Disable',
+    'save' => 'Save',
+    'copyright' => '&copy; 2015 - :year Pterodactyl Software',
 ];

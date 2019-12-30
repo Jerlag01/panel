@@ -34,8 +34,8 @@ class AllocationController extends ApplicationApiController
     /**
      * AllocationController constructor.
      *
-     * @param \Pterodactyl\Services\Allocations\AssignmentService             $assignmentService
-     * @param \Pterodactyl\Services\Allocations\AllocationDeletionService     $deletionService
+     * @param \Pterodactyl\Services\Allocations\AssignmentService $assignmentService
+     * @param \Pterodactyl\Services\Allocations\AllocationDeletionService $deletionService
      * @param \Pterodactyl\Contracts\Repository\AllocationRepositoryInterface $repository
      */
     public function __construct(
@@ -71,14 +71,14 @@ class AllocationController extends ApplicationApiController
      * Store new allocations for a given node.
      *
      * @param \Pterodactyl\Http\Requests\Api\Application\Allocations\StoreAllocationRequest $request
-     * @return array
+     * @return \Illuminate\Http\Response
      *
      * @throws \Pterodactyl\Exceptions\Service\Allocation\CidrOutOfRangeException
      * @throws \Pterodactyl\Exceptions\Service\Allocation\InvalidPortMappingException
      * @throws \Pterodactyl\Exceptions\Service\Allocation\PortOutOfRangeException
      * @throws \Pterodactyl\Exceptions\Service\Allocation\TooManyPortsInRangeException
      */
-    public function store(StoreAllocationRequest $request): array
+    public function store(StoreAllocationRequest $request): Response
     {
         $this->assignmentService->handle($request->getModel(Node::class), $request->validated());
 
