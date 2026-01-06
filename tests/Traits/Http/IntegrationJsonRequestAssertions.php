@@ -1,18 +1,16 @@
 <?php
 
-namespace Tests\Traits\Http;
+namespace Pterodactyl\Tests\Traits\Http;
 
 use Illuminate\Http\Response;
-use Illuminate\Foundation\Testing\TestResponse;
+use Illuminate\Testing\TestResponse;
 
 trait IntegrationJsonRequestAssertions
 {
     /**
      * Make assertions about a 404 response on the API.
-     *
-     * @param \Illuminate\Foundation\Testing\TestResponse $response
      */
-    public function assertNotFoundJson(TestResponse $response)
+    public function assertNotFoundJson(TestResponse $response): void
     {
         $response->assertStatus(Response::HTTP_NOT_FOUND);
         $response->assertJsonStructure(['errors' => [['code', 'status', 'detail']]]);
@@ -22,7 +20,7 @@ trait IntegrationJsonRequestAssertions
                 [
                     'code' => 'NotFoundHttpException',
                     'status' => '404',
-                    'detail' => 'The requested resource does not exist on this server.',
+                    'detail' => 'The requested resource could not be found on the server.',
                 ],
             ],
         ], true);
@@ -30,10 +28,8 @@ trait IntegrationJsonRequestAssertions
 
     /**
      * Make assertions about a 403 error returned by the API.
-     *
-     * @param \Illuminate\Foundation\Testing\TestResponse $response
      */
-    public function assertAccessDeniedJson(TestResponse $response)
+    public function assertAccessDeniedJson(TestResponse $response): void
     {
         $response->assertStatus(Response::HTTP_FORBIDDEN);
         $response->assertJsonStructure(['errors' => [['code', 'status', 'detail']]]);

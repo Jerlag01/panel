@@ -10,38 +10,21 @@ use Illuminate\Contracts\Foundation\Application;
 
 abstract class DaemonRepository
 {
-    /**
-     * @var \Illuminate\Contracts\Foundation\Application
-     */
-    protected $app;
+    protected ?Server $server;
+
+    protected ?Node $node;
 
     /**
-     * @var \Pterodactyl\Models\Server|null
+     * DaemonRepository constructor.
      */
-    protected $server;
-
-    /**
-     * @var \Pterodactyl\Models\Node|null
-     */
-    protected $node;
-
-    /**
-     * BaseWingsRepository constructor.
-     *
-     * @param \Illuminate\Contracts\Foundation\Application $application
-     */
-    public function __construct(Application $application)
+    public function __construct(protected Application $app)
     {
-        $this->app = $application;
     }
 
     /**
      * Set the server model this request is stemming from.
-     *
-     * @param \Pterodactyl\Models\Server $server
-     * @return $this
      */
-    public function setServer(Server $server)
+    public function setServer(Server $server): self
     {
         $this->server = $server;
 
@@ -52,11 +35,8 @@ abstract class DaemonRepository
 
     /**
      * Set the node model this request is stemming from.
-     *
-     * @param \Pterodactyl\Models\Node $node
-     * @return $this
      */
-    public function setNode(Node $node)
+    public function setNode(Node $node): self
     {
         $this->node = $node;
 
@@ -65,9 +45,6 @@ abstract class DaemonRepository
 
     /**
      * Return an instance of the Guzzle HTTP Client to be used for requests.
-     *
-     * @param array $headers
-     * @return \GuzzleHttp\Client
      */
     public function getHttpClient(array $headers = []): Client
     {
@@ -79,7 +56,7 @@ abstract class DaemonRepository
             'timeout' => config('pterodactyl.guzzle.timeout'),
             'connect_timeout' => config('pterodactyl.guzzle.connect_timeout'),
             'headers' => array_merge($headers, [
-                'Authorization' => 'Bearer ' . $this->node->daemonSecret,
+                'Authorization' => 'Bearer ' . $this->node->getDecryptedKey(),
                 'Accept' => 'application/json',
                 'Content-Type' => 'application/json',
             ]),

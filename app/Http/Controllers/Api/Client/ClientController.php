@@ -2,86 +2,84 @@
 
 namespace Pterodactyl\Http\Controllers\Api\Client;
 
-use Pterodactyl\Models\User;
-use Illuminate\Support\Collection;
+use Pterodactyl\Models\Server;
 use Pterodactyl\Models\Permission;
-use Pterodactyl\Repositories\Eloquent\ServerRepository;
+use Spatie\QueryBuilder\QueryBuilder;
+use Spatie\QueryBuilder\AllowedFilter;
+use Pterodactyl\Models\Filters\MultiFieldServerFilter;
 use Pterodactyl\Transformers\Api\Client\ServerTransformer;
 use Pterodactyl\Http\Requests\Api\Client\GetServersRequest;
 
 class ClientController extends ClientApiController
 {
     /**
-     * @var \Pterodactyl\Repositories\Eloquent\ServerRepository
-     */
-    private $repository;
-
-    /**
      * ClientController constructor.
-     *
-     * @param \Pterodactyl\Repositories\Eloquent\ServerRepository $repository
      */
-    public function __construct(ServerRepository $repository)
+    public function __construct()
     {
         parent::__construct();
-
-        $this->repository = $repository;
     }
 
     /**
-     * Return all of the servers available to the client making the API
+     * Return all the servers available to the client making the API
      * request, including servers the user has access to as a subuser.
-     *
-     * @param \Pterodactyl\Http\Requests\Api\Client\GetServersRequest $request
-     * @return array
      */
     public function index(GetServersRequest $request): array
     {
-        // Check for the filter parameter on the request.
-        switch ($request->input('filter')) {
-            case 'all':
-                $filter = User::FILTER_LEVEL_ALL;
-                break;
-            case 'admin':
-                $filter = User::FILTER_LEVEL_ADMIN;
-                break;
-            case 'owner':
-                $filter = User::FILTER_LEVEL_OWNER;
-                break;
-            case 'subuser-of':
-            default:
-                $filter = User::FILTER_LEVEL_SUBUSER;
-                break;
+        $user = $request->user();
+        $transformer = new ServerTransformer();
+
+        // Start the query builder and ensure we eager load any requested relationships from the request.
+        $builder = QueryBuilder::for(
+            Server::query()->with($this->getIncludesForTransformer($transformer, ['node']))
+        )->allowedFilters([
+            'uuid',
+            'name',
+            'description',
+            'external_id',
+            AllowedFilter::custom('*', new MultiFieldServerFilter()),
+        ]);
+
+        $loweredBindings = collect($builder->getBindings())
+            ->map(fn ($f, $key) => is_string($f) ? strtolower($f) : $f)
+            ->all();
+        $builder->setBindings($loweredBindings);
+
+        $type = $request->input('type');
+        // Either return all the servers the user has access to because they are an admin `?type=admin` or
+        // just return all the servers the user has access to because they are the owner or a subuser of the
+        // server. If ?type=admin-all is passed all servers on the system will be returned to the user, rather
+        // than only servers they can see because they are an admin.
+        if (in_array($type, ['admin', 'admin-all'])) {
+            // If they aren't an admin but want all the admin servers don't fail the request, just
+            // make it a query that will never return any results back.
+            if (!$user->root_admin) {
+                $builder->whereRaw('1 = 2');
+            } else {
+                $builder = $type === 'admin-all'
+                    ? $builder
+                    : $builder->whereNotIn('servers.id', $user->accessibleServers()->pluck('id')->all());
+            }
+        } elseif ($type === 'owner') {
+            $builder = $builder->where('servers.owner_id', $user->id);
+        } else {
+            $builder = $builder->whereIn('servers.id', $user->accessibleServers()->pluck('id')->all());
         }
 
-        $servers = $this->repository
-            ->setSearchTerm($request->input('query'))
-            ->filterUserAccessServers(
-                $request->user(), $filter, config('pterodactyl.paginate.frontend.servers')
-            );
+        $servers = $builder->paginate(min($request->query('per_page', 50), 100))->appends($request->query());
 
-        return $this->fractal->collection($servers)
-            ->transformWith($this->getTransformer(ServerTransformer::class))
-            ->toArray();
+        return $this->fractal->transformWith($transformer)->collection($servers)->toArray();
     }
 
     /**
-     * Returns all of the subuser permissions available on the system.
-     *
-     * @return array
+     * Returns all the subuser permissions available on the system.
      */
-    public function permissions()
+    public function permissions(): array
     {
-        $permissions = Permission::permissions()->map(function ($values, $key) {
-            return Collection::make($values)->map(function ($permission) use ($key) {
-                return $key . '.' . $permission;
-            })->values()->toArray();
-        })->flatten();
-
         return [
             'object' => 'system_permissions',
             'attributes' => [
-                'permissions' => $permissions,
+                'permissions' => Permission::permissions(),
             ],
         ];
     }

@@ -1,43 +1,17 @@
 <?php
-/**
- * Pterodactyl - Panel
- * Copyright (c) 2015 - 2017 Dane Everitt <dane@daneeveritt.com>.
- *
- * This software is licensed under the terms of the MIT license.
- * https://opensource.org/licenses/MIT
- */
 
 namespace Pterodactyl\Services\Servers;
 
+use Pterodactyl\Models\Mount;
 use Pterodactyl\Models\Server;
-use Pterodactyl\Contracts\Repository\ServerRepositoryInterface;
 
 class ServerConfigurationStructureService
 {
-    const REQUIRED_RELATIONS = ['allocation', 'allocations', 'pack', 'egg'];
-
-    /**
-     * @var \Pterodactyl\Services\Servers\EnvironmentService
-     */
-    private $environment;
-
-    /**
-     * @var \Pterodactyl\Contracts\Repository\ServerRepositoryInterface
-     */
-    private $repository;
-
     /**
      * ServerConfigurationStructureService constructor.
-     *
-     * @param \Pterodactyl\Contracts\Repository\ServerRepositoryInterface $repository
-     * @param \Pterodactyl\Services\Servers\EnvironmentService $environment
      */
-    public function __construct(
-        ServerRepositoryInterface $repository,
-        EnvironmentService $environment
-    ) {
-        $this->repository = $repository;
-        $this->environment = $environment;
+    public function __construct(private EnvironmentService $environment)
+    {
     }
 
     /**
@@ -45,60 +19,71 @@ class ServerConfigurationStructureService
      *
      * DO NOT MODIFY THIS FUNCTION. This powers legacy code handling for the new Wings
      * daemon, if you modify the structure eggs will break unexpectedly.
-     *
-     * @param \Pterodactyl\Models\Server $server
-     * @param bool $legacy
-     * @return array
-     *
-     * @throws \Pterodactyl\Exceptions\Repository\RecordNotFoundException
      */
-    public function handle(Server $server, bool $legacy = false): array
+    public function handle(Server $server, array $override = [], bool $legacy = false): array
     {
-        $server->loadMissing(self::REQUIRED_RELATIONS);
+        $clone = $server;
+        // If any overrides have been set on this call make sure to update them on the
+        // cloned instance so that the configuration generated uses them.
+        if (!empty($override)) {
+            $clone = $server->fresh();
+            foreach ($override as $key => $value) {
+                $clone->setAttribute($key, $value);
+            }
+        }
 
-        return $legacy ?
-            $this->returnLegacyFormat($server)
-            : $this->returnCurrentFormat($server);
+        return $legacy
+            ? $this->returnLegacyFormat($clone)
+            : $this->returnCurrentFormat($clone);
     }
 
     /**
      * Returns the new data format used for the Wings daemon.
-     *
-     * @param \Pterodactyl\Models\Server $server
-     * @return array
-     *
-     * @throws \Pterodactyl\Exceptions\Repository\RecordNotFoundException
      */
-    protected function returnCurrentFormat(Server $server)
+    protected function returnCurrentFormat(Server $server): array
     {
         return [
             'uuid' => $server->uuid,
-            'suspended' => (bool) $server->suspended,
+            'meta' => [
+                'name' => $server->name,
+                'description' => $server->description,
+            ],
+            'suspended' => $server->isSuspended(),
             'environment' => $this->environment->handle($server),
-            'invocation' => $server->startup,
+            'invocation' => !is_null($server->startup) ? $server->startup : $server->egg->startup,
+            'skip_egg_scripts' => $server->skip_scripts,
             'build' => [
                 'memory_limit' => $server->memory,
                 'swap' => $server->swap,
                 'io_weight' => $server->io,
                 'cpu_limit' => $server->cpu,
+                'threads' => $server->threads,
                 'disk_space' => $server->disk,
-            ],
-            'service' => [
-                'egg' => $server->egg->uuid,
-                'pack' => $server->pack ? $server->pack->uuid : null,
-                'skip_scripts' => $server->skip_scripts,
+                // TODO: remove oom_disabled and use oom_killer, this requires a Wings update.
+                'oom_disabled' => !$server->oom_killer,
+                'oom_killer' => $server->oom_killer,
             ],
             'container' => [
                 'image' => $server->image,
-                'oom_disabled' => $server->oom_disabled,
-                'requires_rebuild' => false,
             ],
             'allocations' => [
                 'default' => [
                     'ip' => $server->allocation->ip,
                     'port' => $server->allocation->port,
                 ],
+                'force_outgoing_ip' => $server->egg->force_outgoing_ip,
                 'mappings' => $server->getAllocationMappings(),
+            ],
+            'mounts' => $server->mounts->map(function (Mount $mount) {
+                return [
+                    'source' => $mount->source,
+                    'target' => $mount->target,
+                    'read_only' => $mount->read_only,
+                ];
+            }),
+            'egg' => [
+                'id' => $server->egg->uuid,
+                'file_denylist' => $server->egg->inherit_file_denylist,
             ],
         ];
     }
@@ -107,12 +92,9 @@ class ServerConfigurationStructureService
      * Returns the legacy server data format to continue support for old egg configurations
      * that have not yet been updated.
      *
-     * @param \Pterodactyl\Models\Server $server
-     * @return array
-     *
-     * @throws \Pterodactyl\Exceptions\Repository\RecordNotFoundException
+     * @deprecated
      */
-    protected function returnLegacyFormat(Server $server)
+    protected function returnLegacyFormat(Server $server): array
     {
         return [
             'uuid' => $server->uuid,
@@ -125,21 +107,21 @@ class ServerConfigurationStructureService
                     return $item->pluck('port');
                 })->toArray(),
                 'env' => $this->environment->handle($server),
-                'oom_disabled' => $server->oom_disabled,
+                'oom_disabled' => !$server->oom_killer,
                 'memory' => (int) $server->memory,
                 'swap' => (int) $server->swap,
                 'io' => (int) $server->io,
                 'cpu' => (int) $server->cpu,
+                'threads' => $server->threads,
                 'disk' => (int) $server->disk,
                 'image' => $server->image,
             ],
             'service' => [
                 'egg' => $server->egg->uuid,
-                'pack' => $server->pack ? $server->pack->uuid : null,
                 'skip_scripts' => $server->skip_scripts,
             ],
             'rebuild' => false,
-            'suspended' => (int) $server->suspended,
+            'suspended' => $server->isSuspended() ? 1 : 0,
         ];
     }
 }

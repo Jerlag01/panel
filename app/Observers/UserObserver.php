@@ -7,44 +7,36 @@ use Pterodactyl\Models\User;
 
 class UserObserver
 {
-    protected $uuid;
+    protected string $uuid;
 
     /**
      * Listen to the User creating event.
-     *
-     * @param \Pterodactyl\Models\User $user
      */
-    public function creating(User $user)
+    public function creating(User $user): void
     {
         event(new Events\User\Creating($user));
     }
 
     /**
      * Listen to the User created event.
-     *
-     * @param \Pterodactyl\Models\User $user
      */
-    public function created(User $user)
+    public function created(User $user): void
     {
         event(new Events\User\Created($user));
     }
 
     /**
      * Listen to the User deleting event.
-     *
-     * @param \Pterodactyl\Models\User $user
      */
-    public function deleting(User $user)
+    public function deleting(User $user): void
     {
         event(new Events\User\Deleting($user));
     }
 
     /**
      * Listen to the User deleted event.
-     *
-     * @param \Pterodactyl\Models\User $user
      */
-    public function deleted(User $user)
+    public function deleted(User $user): void
     {
         event(new Events\User\Deleted($user));
     }

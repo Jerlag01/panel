@@ -2,78 +2,87 @@
 
 namespace Pterodactyl\Services\Schedules;
 
-use Cron\CronExpression;
+use Exception;
 use Pterodactyl\Models\Schedule;
 use Illuminate\Contracts\Bus\Dispatcher;
 use Pterodactyl\Jobs\Schedule\RunTaskJob;
-use Pterodactyl\Contracts\Repository\TaskRepositoryInterface;
-use Pterodactyl\Contracts\Repository\ScheduleRepositoryInterface;
+use Illuminate\Database\ConnectionInterface;
+use Pterodactyl\Exceptions\DisplayException;
+use Pterodactyl\Repositories\Wings\DaemonServerRepository;
+use Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException;
 
 class ProcessScheduleService
 {
     /**
-     * @var \Illuminate\Contracts\Bus\Dispatcher
-     */
-    private $dispatcher;
-
-    /**
-     * @var \Pterodactyl\Contracts\Repository\ScheduleRepositoryInterface
-     */
-    private $scheduleRepository;
-
-    /**
-     * @var \Pterodactyl\Contracts\Repository\TaskRepositoryInterface
-     */
-    private $taskRepository;
-
-    /**
      * ProcessScheduleService constructor.
-     *
-     * @param \Illuminate\Contracts\Bus\Dispatcher $dispatcher
-     * @param \Pterodactyl\Contracts\Repository\ScheduleRepositoryInterface $scheduleRepository
-     * @param \Pterodactyl\Contracts\Repository\TaskRepositoryInterface $taskRepository
      */
-    public function __construct(
-        Dispatcher $dispatcher,
-        ScheduleRepositoryInterface $scheduleRepository,
-        TaskRepositoryInterface $taskRepository
-    ) {
-        $this->dispatcher = $dispatcher;
-        $this->scheduleRepository = $scheduleRepository;
-        $this->taskRepository = $taskRepository;
+    public function __construct(private ConnectionInterface $connection, private Dispatcher $dispatcher, private DaemonServerRepository $serverRepository)
+    {
     }
 
     /**
      * Process a schedule and push the first task onto the queue worker.
      *
-     * @param \Pterodactyl\Models\Schedule $schedule
-     *
-     * @throws \Pterodactyl\Exceptions\Model\DataValidationException
-     * @throws \Pterodactyl\Exceptions\Repository\RecordNotFoundException
+     * @throws \Throwable
      */
-    public function handle(Schedule $schedule)
+    public function handle(Schedule $schedule, bool $now = false): void
     {
-        $this->scheduleRepository->loadTasks($schedule);
+        $task = $schedule->tasks()->orderBy('sequence_id')->first();
 
-        /** @var \Pterodactyl\Models\Task $task */
-        $task = $schedule->getRelation('tasks')->where('sequence_id', 1)->first();
+        if (is_null($task)) {
+            throw new DisplayException('Cannot process schedule for task execution: no tasks are registered.');
+        }
 
-        $formattedCron = sprintf('%s %s %s * %s',
-            $schedule->cron_minute,
-            $schedule->cron_hour,
-            $schedule->cron_day_of_month,
-            $schedule->cron_day_of_week
-        );
+        /* @var \Pterodactyl\Models\Task $task */
+        $this->connection->transaction(function () use ($schedule, $task) {
+            $schedule->forceFill([
+                'is_processing' => true,
+                'next_run_at' => $schedule->getNextRunDate(),
+            ])->saveOrFail();
 
-        $this->scheduleRepository->update($schedule->id, [
-            'is_processing' => true,
-            'next_run_at' => CronExpression::factory($formattedCron)->getNextRunDate(),
-        ]);
+            $task->update(['is_queued' => true]);
+        });
 
-        $this->taskRepository->update($task->id, ['is_queued' => true]);
+        $job = new RunTaskJob($task, $now);
+        if ($schedule->only_when_online) {
+            // Check that the server is currently in a starting or running state before executing
+            // this schedule if this option has been set.
+            try {
+                $details = $this->serverRepository->setServer($schedule->server)->getDetails();
+                $state = $details['state'] ?? 'offline';
+                // If the server is stopping or offline just do nothing with this task.
+                if (in_array($state, ['offline', 'stopping'])) {
+                    $job->failed();
 
-        $this->dispatcher->dispatch(
-            (new RunTaskJob($task->id, $schedule->id))->delay($task->time_offset)
-        );
+                    return;
+                }
+            } catch (\Exception $exception) {
+                if (!$exception instanceof DaemonConnectionException) {
+                    // If we encountered some exception during this process that wasn't just an
+                    // issue connecting to Wings run the failed sequence for a job. Otherwise we
+                    // can just quietly mark the task as completed without actually running anything.
+                    $job->failed($exception);
+                }
+                $job->failed();
+
+                return;
+            }
+        }
+
+        if (!$now) {
+            $this->dispatcher->dispatch($job->delay($task->time_offset));
+        } else {
+            // When using dispatchNow the RunTaskJob::failed() function is not called automatically
+            // so we need to manually trigger it and then continue with the exception throw.
+            //
+            // @see https://github.com/pterodactyl/panel/issues/2550
+            try {
+                $this->dispatcher->dispatchNow($job);
+            } catch (\Exception $exception) {
+                $job->failed($exception);
+
+                throw $exception;
+            }
+        }
     }
 }

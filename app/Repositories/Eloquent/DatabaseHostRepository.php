@@ -10,10 +10,8 @@ class DatabaseHostRepository extends EloquentRepository implements DatabaseHostR
 {
     /**
      * Return the model backing this repository.
-     *
-     * @return string
      */
-    public function model()
+    public function model(): string
     {
         return DatabaseHost::class;
     }
@@ -21,8 +19,6 @@ class DatabaseHostRepository extends EloquentRepository implements DatabaseHostR
     /**
      * Return database hosts with a count of databases and the node
      * information for which it is attached.
-     *
-     * @return \Illuminate\Support\Collection
      */
     public function getWithViewDetails(): Collection
     {

@@ -1,4 +1,5 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
     <head>
         <title>{{ config('app.name', 'Pterodactyl') }}</title>
 
@@ -21,7 +22,7 @@
         @section('user-data')
             @if(!is_null(Auth::user()))
                 <script>
-                    window.PterodactylUser = {!! json_encode(Auth::user()->toVueObject()) !!};
+                    window.PterodactylUser = {!! json_encode(Auth::user()->toReactObject()) !!};
                 </script>
             @endif
             @if(!empty($siteConfiguration))
@@ -30,29 +31,23 @@
                 </script>
             @endif
         @show
+        <style>
+            @import url('//fonts.googleapis.com/css?family=Rubik:300,400,500&display=swap');
+            @import url('//fonts.googleapis.com/css?family=IBM+Plex+Mono|IBM+Plex+Sans:500&display=swap');
+        </style>
 
-        @section('assets')
-            {!! $asset->css('main.css') !!}
-        @show
+        @yield('assets')
 
         @include('layouts.scripts')
+
+        @viteReactRefresh
+        @vite('resources/scripts/index.tsx')
     </head>
     <body class="{{ $css['body'] ?? 'bg-neutral-50' }}">
-        @if(\Illuminate\Support\Str::contains(config('app.version'), ['-alpha', '-beta']))
-            <div class="bg-red-500">
-                <p class="text-center text-white text-sm p-3">
-                    You are running a pre-release version of Pterodactyl. Please report any issues
-                    <a href="https://github.com/pterodactyl/panel/issues" class="text-red-100">via GitHub</a>.
-                </p>
-            </div>
-        @endif
         @section('content')
             @yield('above-container')
             @yield('container')
             @yield('below-container')
-        @show
-        @section('scripts')
-            {!! $asset->js('main.js') !!}
         @show
     </body>
 </html>

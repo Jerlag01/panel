@@ -3,13 +3,12 @@
 namespace Pterodactyl\Transformers\Api\Client;
 
 use Pterodactyl\Models\User;
+use Pterodactyl\Transformers\Api\Transformer;
 
-class AccountTransformer extends BaseClientTransformer
+class AccountTransformer extends Transformer
 {
     /**
      * Return the resource name for the JSONAPI output.
-     *
-     * @return string
      */
     public function getResourceName(): string
     {
@@ -17,20 +16,15 @@ class AccountTransformer extends BaseClientTransformer
     }
 
     /**
-     * Return basic information about the currently logged in user.
-     *
-     * @param \Pterodactyl\Models\User $model
-     * @return array
+     * Return basic information about the currently logged-in user.
      */
-    public function transform(User $model)
+    public function transform(User $model): array
     {
         return [
             'id' => $model->id,
             'admin' => $model->root_admin,
             'username' => $model->username,
             'email' => $model->email,
-            'first_name' => $model->name_first,
-            'last_name' => $model->name_last,
             'language' => $model->language,
         ];
     }

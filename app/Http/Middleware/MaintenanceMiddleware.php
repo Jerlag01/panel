@@ -2,34 +2,22 @@
 
 namespace Pterodactyl\Http\Middleware;
 
-use Closure;
+use Illuminate\Http\Request;
 use Illuminate\Contracts\Routing\ResponseFactory;
 
 class MaintenanceMiddleware
 {
     /**
-     * @var \Illuminate\Contracts\Routing\ResponseFactory
-     */
-    private $response;
-
-    /**
      * MaintenanceMiddleware constructor.
-     *
-     * @param \Illuminate\Contracts\Routing\ResponseFactory $response
      */
-    public function __construct(ResponseFactory $response)
+    public function __construct(private ResponseFactory $response)
     {
-        $this->response = $response;
     }
 
     /**
      * Handle an incoming request.
-     *
-     * @param \Illuminate\Http\Request $request
-     * @param \Closure $next
-     * @return mixed
      */
-    public function handle($request, Closure $next)
+    public function handle(Request $request, \Closure $next): mixed
     {
         /** @var \Pterodactyl\Models\Server $server */
         $server = $request->attributes->get('server');

@@ -13,13 +13,12 @@ class Username implements Rule
 
     /**
      * Validate that a username contains only the allowed characters and starts/ends
-     * with alpha-numeric characters.
+     * with alphanumeric characters.
      *
      * Allowed characters: a-z0-9_-.
      *
      * @param string $attribute
      * @param mixed $value
-     * @return bool
      */
     public function passes($attribute, $value): bool
     {
@@ -28,8 +27,6 @@ class Username implements Rule
 
     /**
      * Return a validation message for use when this rule fails.
-     *
-     * @return string
      */
     public function message(): string
     {
@@ -40,10 +37,8 @@ class Username implements Rule
     /**
      * Convert the rule to a validation string. This is necessary to avoid
      * issues with Eloquence which tries to use this rule as a string.
-     *
-     * @return string
      */
-    public function __toString()
+    public function __toString(): string
     {
         return 'p_username';
     }

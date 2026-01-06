@@ -2,45 +2,37 @@
 
 namespace Pterodactyl\Http\Requests\Api\Application\Allocations;
 
-use Pterodactyl\Services\Acl\Api\AdminAcl;
+use Illuminate\Support\Arr;
 use Pterodactyl\Http\Requests\Api\Application\ApplicationApiRequest;
 
 class StoreAllocationRequest extends ApplicationApiRequest
 {
-    /**
-     * @var string
-     */
-    protected $resource = AdminAcl::RESOURCE_ALLOCATIONS;
-
-    /**
-     * @var int
-     */
-    protected $permission = AdminAcl::WRITE;
-
-    /**
-     * @return array
-     */
     public function rules(): array
     {
         return [
             'ip' => 'required|string',
-            'alias' => 'sometimes|nullable|string|max:255',
+            'alias' => 'sometimes|nullable|string|max:191',
             'ports' => 'required|array',
             'ports.*' => 'string',
         ];
     }
 
     /**
-     * @return array
+     * @param string|null $key
+     * @param string|array|null $default
+     *
+     * @return mixed
      */
-    public function validated()
+    public function validated($key = null, $default = null)
     {
         $data = parent::validated();
 
-        return [
+        $response = [
             'allocation_ip' => $data['ip'],
             'allocation_ports' => $data['ports'],
             'allocation_alias' => $data['alias'] ?? null,
         ];
+
+        return is_null($key) ? $response : Arr::get($response, $key, $default);
     }
 }

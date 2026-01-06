@@ -3,21 +3,21 @@
 namespace Pterodactyl\Transformers\Api\Application;
 
 use Pterodactyl\Models\Node;
+use League\Fractal\Resource\Item;
+use League\Fractal\Resource\Collection;
+use League\Fractal\Resource\NullResource;
 use Pterodactyl\Services\Acl\Api\AdminAcl;
+use Pterodactyl\Transformers\Api\Transformer;
 
-class NodeTransformer extends BaseTransformer
+class NodeTransformer extends Transformer
 {
     /**
      * List of resources that can be included.
-     *
-     * @var array
      */
-    protected $availableIncludes = ['allocations', 'location', 'servers'];
+    protected array $availableIncludes = ['allocations', 'location', 'servers'];
 
     /**
      * Return the resource name for the JSONAPI output.
-     *
-     * @return string
      */
     public function getResourceName(): string
     {
@@ -27,83 +27,57 @@ class NodeTransformer extends BaseTransformer
     /**
      * Return a node transformed into a format that can be consumed by the
      * external administrative API.
-     *
-     * @param \Pterodactyl\Models\Node $node
-     * @return array
      */
-    public function transform(Node $node): array
+    public function transform(Node $model): array
     {
-        $response = collect($node->toArray())->mapWithKeys(function ($value, $key) {
-            // I messed up early in 2016 when I named this column as poorly
-            // as I did. This is the tragic result of my mistakes.
-            $key = ($key === 'daemonSFTP') ? 'daemonSftp' : $key;
+        $response = $model->toArray();
 
-            return [snake_case($key) => $value];
-        })->toArray();
+        $response['created_at'] = self::formatTimestamp($model->created_at);
+        $response['updated_at'] = self::formatTimestamp($model->updated_at);
 
-        $response[$node->getUpdatedAtColumn()] = $this->formatTimestamp($node->updated_at);
-        $response[$node->getCreatedAtColumn()] = $this->formatTimestamp($node->created_at);
+        $resources = $model->servers()->select(['memory', 'disk'])->get();
+
+        $response['allocated_resources'] = [
+            'memory' => $resources->sum('memory'),
+            'disk' => $resources->sum('disk'),
+        ];
 
         return $response;
     }
 
     /**
-     * Return the nodes associated with this location.
-     *
-     * @param \Pterodactyl\Models\Node $node
-     * @return \League\Fractal\Resource\Collection|\League\Fractal\Resource\NullResource
-     * @throws \Pterodactyl\Exceptions\Transformer\InvalidTransformerLevelException
+     * Return the allocations associated with this node.
      */
-    public function includeAllocations(Node $node)
+    public function includeAllocations(Node $node): Collection|NullResource
     {
-        if (! $this->authorize(AdminAcl::RESOURCE_ALLOCATIONS)) {
+        if (!$this->authorize(AdminAcl::RESOURCE_ALLOCATIONS)) {
             return $this->null();
         }
 
-        $node->loadMissing('allocations');
-
-        return $this->collection(
-            $node->getRelation('allocations'), $this->makeTransformer(AllocationTransformer::class), 'allocation'
-        );
+        return $this->collection($node->allocations, new AllocationTransformer());
     }
 
     /**
-     * Return the nodes associated with this location.
-     *
-     * @param \Pterodactyl\Models\Node $node
-     * @return \League\Fractal\Resource\Item|\League\Fractal\Resource\NullResource
-     * @throws \Pterodactyl\Exceptions\Transformer\InvalidTransformerLevelException
+     * Return the location associated with this node.
      */
-    public function includeLocation(Node $node)
+    public function includeLocation(Node $node): Item|NullResource
     {
-        if (! $this->authorize(AdminAcl::RESOURCE_LOCATIONS)) {
+        if (!$this->authorize(AdminAcl::RESOURCE_LOCATIONS)) {
             return $this->null();
         }
 
-        $node->loadMissing('location');
-
-        return $this->item(
-            $node->getRelation('location'), $this->makeTransformer(LocationTransformer::class), 'location'
-        );
+        return $this->item($node->location, new LocationTransformer());
     }
 
     /**
-     * Return the nodes associated with this location.
-     *
-     * @param \Pterodactyl\Models\Node $node
-     * @return \League\Fractal\Resource\Collection|\League\Fractal\Resource\NullResource
-     * @throws \Pterodactyl\Exceptions\Transformer\InvalidTransformerLevelException
+     * Return the servers associated with this node.
      */
-    public function includeServers(Node $node)
+    public function includeServers(Node $node): Collection|NullResource
     {
-        if (! $this->authorize(AdminAcl::RESOURCE_SERVERS)) {
+        if (!$this->authorize(AdminAcl::RESOURCE_SERVERS)) {
             return $this->null();
         }
 
-        $node->loadMissing('servers');
-
-        return $this->collection(
-            $node->getRelation('servers'), $this->makeTransformer(ServerTransformer::class), 'server'
-        );
+        return $this->collection($node->servers, new ServerTransformer());
     }
 }

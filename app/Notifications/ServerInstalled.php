@@ -2,9 +2,12 @@
 
 namespace Pterodactyl\Notifications;
 
+use Pterodactyl\Models\User;
 use Illuminate\Bus\Queueable;
 use Pterodactyl\Events\Event;
+use Pterodactyl\Models\Server;
 use Illuminate\Container\Container;
+use Pterodactyl\Events\Server\Installed;
 use Illuminate\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Pterodactyl\Contracts\Core\ReceivesEvents;
@@ -15,28 +18,22 @@ class ServerInstalled extends Notification implements ShouldQueue, ReceivesEvent
 {
     use Queueable;
 
-    /**
-     * @var \Pterodactyl\Models\Server
-     */
-    public $server;
+    public Server $server;
 
-    /**
-     * @var \Pterodactyl\Models\User
-     */
-    public $user;
+    public User $user;
 
     /**
      * Handle a direct call to this notification from the server installed event. This is configured
      * in the event service provider.
-     *
-     * @param \Pterodactyl\Events\Event|\Pterodactyl\Events\Server\Installed $event
      */
-    public function handle(Event $event): void
+    public function handle(Event|Installed $notification): void
     {
-        $event->server->loadMissing('user');
+        abort_unless($notification instanceof Installed, 500);
+        /* @var Installed $notification */
+        $notification->server->loadMissing('user');
 
-        $this->server = $event->server;
-        $this->user = $event->server->user;
+        $this->server = $notification->server;
+        $this->user = $notification->server->user;
 
         // Since we are calling this notification directly from an event listener we need to fire off the dispatcher
         // to send the email now. Don't use send() or you'll end up firing off two different events.
@@ -45,22 +42,18 @@ class ServerInstalled extends Notification implements ShouldQueue, ReceivesEvent
 
     /**
      * Get the notification's delivery channels.
-     *
-     * @return array
      */
-    public function via()
+    public function via(): array
     {
         return ['mail'];
     }
 
     /**
      * Get the mail representation of the notification.
-     *
-     * @return \Illuminate\Notifications\Messages\MailMessage
      */
-    public function toMail()
+    public function toMail(): MailMessage
     {
-        return (new MailMessage)
+        return (new MailMessage())
             ->greeting('Hello ' . $this->user->username . '.')
             ->line('Your server has finished installing and is now ready for you to use.')
             ->line('Server Name: ' . $this->server->name)

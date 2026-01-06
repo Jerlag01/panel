@@ -1,76 +1,159 @@
-import React, { useEffect, useState } from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTimes } from '@fortawesome/free-solid-svg-icons/faTimes';
-import { CSSTransition } from 'react-transition-group';
+import type { ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import styled, { css } from 'styled-components';
+import tw from 'twin.macro';
+
 import Spinner from '@/components/elements/Spinner';
+import { breakpoint } from '@/theme';
+import FadeTransition from '@/components/elements/transitions/FadeTransition';
 
 export interface RequiredModalProps {
+    children?: ReactNode;
+
     visible: boolean;
     onDismissed: () => void;
     appear?: boolean;
+    top?: boolean;
 }
 
-type Props = RequiredModalProps & {
+export interface ModalProps extends RequiredModalProps {
     dismissable?: boolean;
     closeOnEscape?: boolean;
     closeOnBackground?: boolean;
     showSpinnerOverlay?: boolean;
-    children: React.ReactNode;
 }
 
-export default (props: Props) => {
-    const [render, setRender] = useState(props.visible);
+export const ModalMask = styled.div`
+    ${tw`fixed z-50 overflow-auto flex w-full inset-0`};
+    background: rgba(0, 0, 0, 0.7);
+`;
 
-    const handleEscapeEvent = (e: KeyboardEvent) => {
-        if (props.dismissable !== false && props.closeOnEscape !== false && e.key === 'Escape') {
-            setRender(false);
+const ModalContainer = styled.div<{ alignTop?: boolean }>`
+    max-width: 95%;
+    max-height: calc(100vh - 8rem);
+    ${breakpoint('md')`max-width: 75%`};
+    ${breakpoint('lg')`max-width: 50%`};
+
+    ${tw`relative flex flex-col w-full m-auto`};
+    ${props =>
+        props.alignTop &&
+        css`
+            margin-top: 20%;
+            ${breakpoint('md')`margin-top: 10%`};
+        `};
+
+    margin-bottom: auto;
+
+    & > .close-icon {
+        ${tw`absolute right-0 p-2 text-white cursor-pointer opacity-50 transition-all duration-150 ease-linear hover:opacity-100`};
+        top: -2.5rem;
+
+        &:hover {
+            ${tw`transform rotate-90`}
         }
-    };
 
-    useEffect(() => setRender(props.visible), [props.visible]);
+        & > svg {
+            ${tw`w-6 h-6`};
+        }
+    }
+`;
+
+function Modal({
+    visible,
+    appear,
+    dismissable,
+    showSpinnerOverlay,
+    top = true,
+    closeOnBackground = true,
+    closeOnEscape = true,
+    onDismissed,
+    children,
+}: ModalProps) {
+    const [render, setRender] = useState(visible);
+
+    const isDismissable = useMemo(() => {
+        return (dismissable || true) && !(showSpinnerOverlay || false);
+    }, [dismissable, showSpinnerOverlay]);
 
     useEffect(() => {
-        window.addEventListener('keydown', handleEscapeEvent);
+        if (!isDismissable || !closeOnEscape) return;
 
-        return () => window.removeEventListener('keydown', handleEscapeEvent);
-    }, [render]);
+        const handler = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setRender(false);
+        };
+
+        window.addEventListener('keydown', handler);
+        return () => {
+            window.removeEventListener('keydown', handler);
+        };
+    }, [isDismissable, closeOnEscape, render]);
+
+    useEffect(() => {
+        setRender(visible);
+
+        if (!visible) {
+            onDismissed();
+        }
+    }, [visible]);
 
     return (
-        <CSSTransition
-            timeout={250}
-            classNames={'fade'}
-            appear={props.appear}
-            in={render}
-            unmountOnExit={true}
-            onExited={() => props.onDismissed()}
-        >
-            <div className={'modal-mask'} onClick={e => {
-                if (props.dismissable !== false && props.closeOnBackground !== false) {
-                    e.stopPropagation();
-                    if (e.target === e.currentTarget) {
-                        setRender(false);
+        <FadeTransition as={Fragment} show={render} duration="duration-150" appear={appear ?? true} unmount>
+            <ModalMask
+                onClick={e => e.stopPropagation()}
+                onContextMenu={e => e.stopPropagation()}
+                onMouseDown={e => {
+                    if (isDismissable && closeOnBackground) {
+                        e.stopPropagation();
+                        if (e.target === e.currentTarget) {
+                            setRender(false);
+                        }
                     }
-                }
-            }}>
-                <div className={'modal-container top'}>
-                    {props.dismissable !== false &&
-                    <div className={'modal-close-icon'} onClick={() => setRender(false)}>
-                        <FontAwesomeIcon icon={faTimes}/>
-                    </div>
-                    }
-                    {props.showSpinnerOverlay &&
+                }}
+            >
+                <ModalContainer alignTop={top}>
+                    {isDismissable && (
+                        <div className={'close-icon'} onClick={() => setRender(false)}>
+                            <svg
+                                xmlns={'http://www.w3.org/2000/svg'}
+                                fill={'none'}
+                                viewBox={'0 0 24 24'}
+                                stroke={'currentColor'}
+                            >
+                                <path
+                                    strokeLinecap={'round'}
+                                    strokeLinejoin={'round'}
+                                    strokeWidth={'2'}
+                                    d={'M6 18L18 6M6 6l12 12'}
+                                />
+                            </svg>
+                        </div>
+                    )}
+
+                    <FadeTransition duration="duration-150" show={showSpinnerOverlay ?? false} appear>
+                        <div
+                            css={tw`absolute w-full h-full rounded flex items-center justify-center`}
+                            style={{ background: 'hsla(211, 10%, 53%, 0.35)', zIndex: 9999 }}
+                        >
+                            <Spinner />
+                        </div>
+                    </FadeTransition>
+
                     <div
-                        className={'absolute w-full h-full rounded flex items-center justify-center'}
-                        style={{ background: 'hsla(211, 10%, 53%, 0.25)' }}
+                        css={tw`bg-neutral-800 p-3 sm:p-4 md:p-6 rounded shadow-md overflow-y-scroll transition-all duration-150`}
                     >
-                        <Spinner/>
+                        {children}
                     </div>
-                    }
-                    <div className={'modal-content p-6'}>
-                        {props.children}
-                    </div>
-                </div>
-            </div>
-        </CSSTransition>
+                </ModalContainer>
+            </ModalMask>
+        </FadeTransition>
     );
-};
+}
+
+function PortaledModal({ children, ...props }: ModalProps): JSX.Element {
+    const element = useRef(document.getElementById('modal-portal'));
+
+    return createPortal(<Modal {...props}>{children}</Modal>, element.current!);
+}
+
+export default PortaledModal;

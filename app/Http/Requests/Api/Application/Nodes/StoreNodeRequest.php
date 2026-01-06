@@ -2,58 +2,48 @@
 
 namespace Pterodactyl\Http\Requests\Api\Application\Nodes;
 
+use Illuminate\Support\Arr;
 use Pterodactyl\Models\Node;
-use Pterodactyl\Services\Acl\Api\AdminAcl;
 use Pterodactyl\Http\Requests\Api\Application\ApplicationApiRequest;
 
 class StoreNodeRequest extends ApplicationApiRequest
 {
     /**
-     * @var string
-     */
-    protected $resource = AdminAcl::RESOURCE_NODES;
-
-    /**
-     * @var int
-     */
-    protected $permission = AdminAcl::WRITE;
-
-    /**
      * Validation rules to apply to this request.
-     *
-     * @param null|array $rules
-     * @return array
      */
     public function rules(array $rules = null): array
     {
         return collect($rules ?? Node::getRules())->only([
-            'public',
             'name',
+            'description',
             'location_id',
+            'database_host_id',
             'fqdn',
             'scheme',
             'behind_proxy',
+            'public',
+
+            'listen_port_http',
+            'public_port_http',
+            'listen_port_sftp',
+            'public_port_sftp',
+
             'memory',
             'memory_overallocate',
             'disk',
             'disk_overallocate',
-            'upload_size',
-            'daemonListen',
-            'daemonSFTP',
-            'daemonBase',
-        ])->mapWithKeys(function ($value, $key) {
-            $key = ($key === 'daemonSFTP') ? 'daemonSftp' : $key;
 
+            'upload_size',
+            'daemon_base',
+        ])->mapWithKeys(function ($value, $key) {
             return [snake_case($key) => $value];
         })->toArray();
     }
 
     /**
      * Fields to rename for clarity in the API response.
-     *
-     * @return array
      */
-    public function attributes()
+    public function attributes(): array
     {
         return [
             'daemon_base' => 'Daemon Base Path',
@@ -66,17 +56,15 @@ class StoreNodeRequest extends ApplicationApiRequest
     /**
      * Change the formatting of some data keys in the validated response data
      * to match what the application expects in the services.
-     *
-     * @return array
      */
-    public function validated()
+    public function validated($key = null, $default = null): array
     {
         $response = parent::validated();
-        $response['daemonListen'] = $response['daemon_listen'];
-        $response['daemonSFTP'] = $response['daemon_sftp'];
-        $response['daemonBase'] = $response['daemon_base'] ?? (new Node)->getAttribute('daemonBase');
+        $response['daemon_base'] = $response['daemon_base'] ?? Node::DEFAULT_DAEMON_BASE;
 
-        unset($response['daemon_base'], $response['daemon_listen'], $response['daemon_sftp']);
+        if (!is_null($key)) {
+            return Arr::get($response, $key, $default);
+        }
 
         return $response;
     }

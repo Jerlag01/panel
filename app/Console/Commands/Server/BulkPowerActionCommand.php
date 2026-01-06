@@ -2,67 +2,35 @@
 
 namespace Pterodactyl\Console\Commands\Server;
 
+use Pterodactyl\Models\Server;
 use Illuminate\Console\Command;
-use GuzzleHttp\Exception\RequestException;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\ValidationException;
-use Pterodactyl\Repositories\Daemon\PowerRepository;
 use Illuminate\Validation\Factory as ValidatorFactory;
-use Pterodactyl\Contracts\Repository\ServerRepositoryInterface;
+use Pterodactyl\Repositories\Wings\DaemonPowerRepository;
+use Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException;
 
 class BulkPowerActionCommand extends Command
 {
-    /**
-     * @var \Pterodactyl\Contracts\Repository\Daemon\PowerRepositoryInterface
-     */
-    private $powerRepository;
-
-    /**
-     * @var \Pterodactyl\Contracts\Repository\ServerRepositoryInterface
-     */
-    private $repository;
-
-    /**
-     * @var \Illuminate\Validation\Factory
-     */
-    private $validator;
-
-    /**
-     * @var string
-     */
     protected $signature = 'p:server:bulk-power
                             {action : The action to perform (start, stop, restart, kill)}
                             {--servers= : A comma separated list of servers.}
                             {--nodes= : A comma separated list of nodes.}';
 
-    /**
-     * @var string
-     */
     protected $description = 'Perform bulk power management on large groupings of servers or nodes at once.';
 
     /**
      * BulkPowerActionCommand constructor.
-     *
-     * @param \Pterodactyl\Repositories\Daemon\PowerRepository $powerRepository
-     * @param \Pterodactyl\Contracts\Repository\ServerRepositoryInterface $repository
-     * @param \Illuminate\Validation\Factory $validator
      */
-    public function __construct(
-        PowerRepository $powerRepository,
-        ServerRepositoryInterface $repository,
-        ValidatorFactory $validator
-    ) {
+    public function __construct(private DaemonPowerRepository $powerRepository, private ValidatorFactory $validator)
+    {
         parent::__construct();
-
-        $this->powerRepository = $powerRepository;
-        $this->repository = $repository;
-        $this->validator = $validator;
     }
 
     /**
      * Handle the bulk power request.
      *
      * @throws \Illuminate\Validation\ValidationException
-     * @throws \Pterodactyl\Exceptions\Repository\Daemon\InvalidPowerSignalException
      */
     public function handle()
     {
@@ -90,23 +58,19 @@ class BulkPowerActionCommand extends Command
             throw new ValidationException($validator);
         }
 
-        $count = $this->repository->getServersForPowerActionCount($servers, $nodes);
-        if (! $this->confirm(trans('command/messages.server.power.confirm', ['action' => $action, 'count' => $count]))) {
+        $count = $this->getQueryBuilder($servers, $nodes)->count();
+        if (!$this->confirm(trans('command/messages.server.power.confirm', ['action' => $action, 'count' => $count])) && $this->input->isInteractive()) {
             return;
         }
 
         $bar = $this->output->createProgressBar($count);
-        $servers = $this->repository->getServersForPowerAction($servers, $nodes);
-
-        $servers->each(function ($server) use ($action, &$bar) {
+        $powerRepository = $this->powerRepository;
+        $this->getQueryBuilder($servers, $nodes)->each(function (Server $server) use ($action, $powerRepository, &$bar) {
             $bar->clear();
 
             try {
-                $this->powerRepository
-                    ->setNode($server->node)
-                    ->setServer($server)
-                    ->sendSignal($action);
-            } catch (RequestException $exception) {
+                $powerRepository->setServer($server)->send($action);
+            } catch (DaemonConnectionException $exception) {
                 $this->output->error(trans('command/messages.server.power.action_failed', [
                     'name' => $server->name,
                     'id' => $server->id,
@@ -120,5 +84,23 @@ class BulkPowerActionCommand extends Command
         });
 
         $this->line('');
+    }
+
+    /**
+     * Returns the query builder instance that will return the servers that should be affected.
+     */
+    protected function getQueryBuilder(array $servers, array $nodes): Builder
+    {
+        $instance = Server::query()->whereNull('status');
+
+        if (!empty($nodes) && !empty($servers)) {
+            $instance->whereIn('id', $servers)->orWhereIn('node_id', $nodes);
+        } elseif (empty($nodes) && !empty($servers)) {
+            $instance->whereIn('id', $servers);
+        } elseif (!empty($nodes) && empty($servers)) {
+            $instance->whereIn('node_id', $nodes);
+        }
+
+        return $instance->with('node');
     }
 }

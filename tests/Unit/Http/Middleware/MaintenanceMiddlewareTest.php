@@ -1,8 +1,9 @@
 <?php
 
-namespace Tests\Unit\Http\Middleware;
+namespace Pterodactyl\Tests\Unit\Http\Middleware;
 
 use Mockery as m;
+use Mockery\MockInterface;
 use Pterodactyl\Models\Node;
 use Illuminate\Http\Response;
 use Pterodactyl\Models\Server;
@@ -11,15 +12,12 @@ use Pterodactyl\Http\Middleware\MaintenanceMiddleware;
 
 class MaintenanceMiddlewareTest extends MiddlewareTestCase
 {
-    /**
-     * @var \Illuminate\Contracts\Routing\ResponseFactory|\Mockery\Mock
-     */
-    private $response;
+    private MockInterface $response;
 
     /**
      * Setup tests.
      */
-    public function setUp()
+    public function setUp(): void
     {
         parent::setUp();
 
@@ -31,8 +29,8 @@ class MaintenanceMiddlewareTest extends MiddlewareTestCase
      */
     public function testHandle()
     {
-        $server = factory(Server::class)->make();
-        $node = factory(Node::class)->make(['maintenance' => 0]);
+        $server = Server::factory()->make();
+        $node = Node::factory()->make(['maintenance' => 0]);
 
         $server->setRelation('node', $node);
         $this->setRequestAttribute('server', $server);
@@ -45,8 +43,8 @@ class MaintenanceMiddlewareTest extends MiddlewareTestCase
      */
     public function testHandleInMaintenanceMode()
     {
-        $server = factory(Server::class)->make();
-        $node = factory(Node::class)->make(['maintenance_mode' => 1]);
+        $server = Server::factory()->make();
+        $node = Node::factory()->make(['maintenance_mode' => 1]);
 
         $server->setRelation('node', $node);
         $this->setRequestAttribute('server', $server);
@@ -54,15 +52,12 @@ class MaintenanceMiddlewareTest extends MiddlewareTestCase
         $this->response->shouldReceive('view')
             ->once()
             ->with('errors.maintenance')
-            ->andReturn(new Response);
+            ->andReturn(new Response());
 
         $response = $this->getMiddleware()->handle($this->request, $this->getClosureAssertions());
         $this->assertInstanceOf(Response::class, $response);
     }
 
-    /**
-     * @return \Pterodactyl\Http\Middleware\MaintenanceMiddleware
-     */
     private function getMiddleware(): MaintenanceMiddleware
     {
         return new MaintenanceMiddleware($this->response);

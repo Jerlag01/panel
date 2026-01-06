@@ -1,9 +1,9 @@
-import { SubuserPermission } from '@/state/server/subusers';
+import { PanelPermissions } from '@/state/permissions';
 import http from '@/api/http';
 
-export default (): Promise<SubuserPermission[]> => {
+export default (): Promise<PanelPermissions> => {
     return new Promise((resolve, reject) => {
-        http.get(`/api/client/permissions`)
+        http.get('/api/client/permissions')
             .then(({ data }) => resolve(data.attributes.permissions))
             .catch(reject);
     });

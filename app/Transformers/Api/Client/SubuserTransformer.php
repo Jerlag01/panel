@@ -2,20 +2,13 @@
 
 namespace Pterodactyl\Transformers\Api\Client;
 
-use Pterodactyl\Models\User;
 use Pterodactyl\Models\Subuser;
+use Pterodactyl\Transformers\Api\Transformer;
 
-class SubuserTransformer extends BaseClientTransformer
+class SubuserTransformer extends Transformer
 {
     /**
-     * @var array
-     */
-    protected $defaultIncludes = ['user'];
-
-    /**
      * Return the resource name for the JSONAPI output.
-     *
-     * @return string
      */
     public function getResourceName(): string
     {
@@ -24,26 +17,12 @@ class SubuserTransformer extends BaseClientTransformer
 
     /**
      * Transforms a subuser into a model that can be shown to a front-end user.
-     *
-     * @param \Pterodactyl\Models\Subuser $model
-     * @return array|void
      */
-    public function transform(Subuser $model)
+    public function transform(Subuser $model): array
     {
-        return [
-            'permissions' => $model->permissions->pluck('permission'),
-        ];
-    }
-
-    /**
-     * Include the permissions associated with this subuser.
-     *
-     * @param \Pterodactyl\Models\Subuser $model
-     * @return \League\Fractal\Resource\Item
-     * @throws \Pterodactyl\Exceptions\Transformer\InvalidTransformerLevelException
-     */
-    public function includeUser(Subuser $model)
-    {
-        return $this->item($model->user, $this->makeTransformer(UserTransformer::class), User::RESOURCE_NAME);
+        return array_merge(
+            (new UserTransformer())->transform($model->user),
+            ['permissions' => $model->permissions]
+        );
     }
 }

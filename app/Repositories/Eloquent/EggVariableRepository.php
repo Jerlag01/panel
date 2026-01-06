@@ -10,10 +10,8 @@ class EggVariableRepository extends EloquentRepository implements EggVariableRep
 {
     /**
      * Return the model backing this repository.
-     *
-     * @return string
      */
-    public function model()
+    public function model(): string
     {
         return EggVariable::class;
     }
@@ -21,9 +19,6 @@ class EggVariableRepository extends EloquentRepository implements EggVariableRep
     /**
      * Return editable variables for a given egg. Editable variables must be set to
      * user viewable in order to be picked up by this function.
-     *
-     * @param int $egg
-     * @return \Illuminate\Support\Collection
      */
     public function getEditableVariables(int $egg): Collection
     {

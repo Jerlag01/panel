@@ -2,24 +2,21 @@
 
 namespace Pterodactyl\Http\Requests\Api\Client\Servers;
 
-use Pterodactyl\Models\Server;
+use Pterodactyl\Models\Permission;
+use Pterodactyl\Http\Requests\Api\Client\ClientApiRequest;
 
-class SendCommandRequest extends GetServerRequest
+class SendCommandRequest extends ClientApiRequest
 {
     /**
      * Determine if the API user has permission to perform this action.
-     *
-     * @return bool
      */
-    public function authorize(): bool
+    public function permission(): string
     {
-        return $this->user()->can('control.console', $this->getModel(Server::class));
+        return Permission::ACTION_CONTROL_CONSOLE;
     }
 
     /**
      * Rules to validate this request against.
-     *
-     * @return array
      */
     public function rules(): array
     {

@@ -1,78 +1,122 @@
-import * as React from 'react';
+import { useStoreState } from 'easy-peasy';
+import type { FormikHelpers } from 'formik';
+import { Formik } from 'formik';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import Reaptcha from 'reaptcha';
+import tw from 'twin.macro';
+import { object, string } from 'yup';
+
 import requestPasswordResetEmail from '@/api/auth/requestPasswordResetEmail';
 import { httpErrorToHuman } from '@/api/http';
 import LoginFormContainer from '@/components/auth/LoginFormContainer';
-import { Actions, useStoreActions } from 'easy-peasy';
-import FlashMessageRender from '@/components/FlashMessageRender';
-import { ApplicationStore } from '@/state';
+import Button from '@/components/elements/Button';
+import Field from '@/components/elements/Field';
+import useFlash from '@/plugins/useFlash';
 
-export default () => {
-    const [ isSubmitting, setSubmitting ] = React.useState(false);
-    const [ email, setEmail ] = React.useState('');
+interface Values {
+    email: string;
+}
 
-    const { clearFlashes, addFlash } = useStoreActions((actions: Actions<ApplicationStore>) => actions.flashes);
+function ForgotPasswordContainer() {
+    const ref = useRef<Reaptcha>(null);
+    const [token, setToken] = useState('');
 
-    const handleFieldUpdate = (e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value);
+    const { clearFlashes, addFlash } = useFlash();
+    const { enabled: recaptchaEnabled, siteKey } = useStoreState(state => state.settings.data!.recaptcha);
 
-    const handleSubmission = (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-
-        setSubmitting(true);
+    useEffect(() => {
         clearFlashes();
-        requestPasswordResetEmail(email)
+    }, []);
+
+    const handleSubmission = ({ email }: Values, { setSubmitting, resetForm }: FormikHelpers<Values>) => {
+        clearFlashes();
+
+        // If there is no token in the state yet, request the token and then abort this submit request
+        // since it will be re-submitted when the recaptcha data is returned by the component.
+        if (recaptchaEnabled && !token) {
+            ref.current!.execute().catch(error => {
+                console.error(error);
+
+                setSubmitting(false);
+                addFlash({ type: 'error', title: 'Error', message: httpErrorToHuman(error) });
+            });
+
+            return;
+        }
+
+        requestPasswordResetEmail(email, token)
             .then(response => {
-                setEmail('');
+                resetForm();
                 addFlash({ type: 'success', title: 'Success', message: response });
             })
             .catch(error => {
                 console.error(error);
                 addFlash({ type: 'error', title: 'Error', message: httpErrorToHuman(error) });
             })
-            .then(() => setSubmitting(false));
+            .then(() => {
+                setToken('');
+                if (ref.current !== null) {
+                    void ref.current.reset();
+                }
+
+                setSubmitting(false);
+            });
     };
 
     return (
-        <div>
-            <h2 className={'text-center text-neutral-100 font-medium py-4'}>
-                Request Password Reset
-            </h2>
-            <FlashMessageRender/>
-            <LoginFormContainer onSubmit={handleSubmission}>
-                <label htmlFor={'email'}>Email</label>
-                <input
-                    id={'email'}
-                    type={'email'}
-                    required={true}
-                    className={'input'}
-                    value={email}
-                    onChange={handleFieldUpdate}
-                    autoFocus={true}
-                />
-                <p className={'input-help'}>
-                    Enter your account email address to receive instructions on resetting your password.
-                </p>
-                <div className={'mt-6'}>
-                    <button
-                        className={'btn btn-primary btn-jumbo flex justify-center'}
-                        disabled={isSubmitting || email.length < 5}
-                    >
-                        {isSubmitting ?
-                            <div className={'spinner-circle spinner-sm spinner-white'}></div>
-                            :
-                            'Send Email'
+        <Formik
+            onSubmit={handleSubmission}
+            initialValues={{ email: '' }}
+            validationSchema={object().shape({
+                email: string()
+                    .email('A valid email address must be provided to continue.')
+                    .required('A valid email address must be provided to continue.'),
+            })}
+        >
+            {({ isSubmitting, setSubmitting, submitForm }) => (
+                <LoginFormContainer title={'Request Password Reset'} css={tw`w-full flex`}>
+                    <Field
+                        light
+                        label={'Email'}
+                        description={
+                            'Enter your account email address to receive instructions on resetting your password.'
                         }
-                    </button>
-                </div>
-                <div className={'mt-6 text-center'}>
-                    <Link
-                        to={'/auth/login'}
-                        className={'text-xs text-neutral-500 tracking-wide uppercase no-underline hover:text-neutral-700'}
-                    >
-                        Return to Login
-                    </Link>
-                </div>
-            </LoginFormContainer>
-        </div>
+                        name={'email'}
+                        type={'email'}
+                    />
+                    <div css={tw`mt-6`}>
+                        <Button type={'submit'} size={'xlarge'} disabled={isSubmitting} isLoading={isSubmitting}>
+                            Send Email
+                        </Button>
+                    </div>
+                    {recaptchaEnabled && (
+                        <Reaptcha
+                            ref={ref}
+                            size={'invisible'}
+                            sitekey={siteKey || '_invalid_key'}
+                            onVerify={response => {
+                                setToken(response);
+                                void submitForm();
+                            }}
+                            onExpire={() => {
+                                setSubmitting(false);
+                                setToken('');
+                            }}
+                        />
+                    )}
+                    <div css={tw`mt-6 text-center`}>
+                        <Link
+                            to={'/auth/login'}
+                            css={tw`text-xs text-neutral-500 tracking-wide uppercase no-underline hover:text-neutral-700`}
+                        >
+                            Return to Login
+                        </Link>
+                    </div>
+                </LoginFormContainer>
+            )}
+        </Formik>
     );
-};
+}
+
+export default ForgotPasswordContainer;

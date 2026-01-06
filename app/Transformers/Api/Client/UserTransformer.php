@@ -2,15 +2,13 @@
 
 namespace Pterodactyl\Transformers\Api\Client;
 
-use Illuminate\Support\Str;
 use Pterodactyl\Models\User;
+use Pterodactyl\Transformers\Api\Transformer;
 
-class UserTransformer extends BaseClientTransformer
+class UserTransformer extends Transformer
 {
     /**
      * Return the resource name for the JSONAPI output.
-     *
-     * @return string
      */
     public function getResourceName(): string
     {
@@ -20,19 +18,16 @@ class UserTransformer extends BaseClientTransformer
     /**
      * Transforms a User model into a representation that can be shown to regular
      * users of the API.
-     *
-     * @param \Pterodactyl\Models\User $model
-     * @return array
      */
-    public function transform(User $model)
+    public function transform(User $model): array
     {
         return [
             'uuid' => $model->uuid,
             'username' => $model->username,
             'email' => $model->email,
-            'image' => 'https://gravatar.com/avatar/' . md5(Str::lower($model->email)),
+            'image' => $model->avatar_url,
             '2fa_enabled' => $model->use_totp,
-            'created_at' => $model->created_at->toIso8601String(),
+            'created_at' => self::formatTimestamp($model->created_at),
         ];
     }
 }

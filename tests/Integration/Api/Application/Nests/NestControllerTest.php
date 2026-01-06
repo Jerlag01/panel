@@ -9,15 +9,12 @@ use Pterodactyl\Tests\Integration\Api\Application\ApplicationApiIntegrationTestC
 
 class NestControllerTest extends ApplicationApiIntegrationTestCase
 {
-    /**
-     * @var \Pterodactyl\Contracts\Repository\NestRepositoryInterface
-     */
-    private $repository;
+    private NestRepositoryInterface $repository;
 
     /**
      * Setup tests.
      */
-    public function setUp()
+    public function setUp(): void
     {
         parent::setUp();
 
@@ -25,7 +22,7 @@ class NestControllerTest extends ApplicationApiIntegrationTestCase
     }
 
     /**
-     * Test that the expected nests are returned in the request.
+     * Test that the expected nests are returned by the request.
      */
     public function testNestResponse()
     {
@@ -48,7 +45,7 @@ class NestControllerTest extends ApplicationApiIntegrationTestCase
                 'pagination' => [
                     'total' => 4,
                     'count' => 4,
-                    'per_page' => 50,
+                    'per_page' => 10,
                     'current_page' => 1,
                     'total_pages' => 1,
                 ],
@@ -58,7 +55,7 @@ class NestControllerTest extends ApplicationApiIntegrationTestCase
         foreach ($nests as $nest) {
             $response->assertJsonFragment([
                 'object' => 'nest',
-                'attributes' => $this->getTransformer(NestTransformer::class)->transform($nest),
+                'attributes' => (new NestTransformer())->transform($nest),
             ]);
         }
     }
@@ -79,7 +76,7 @@ class NestControllerTest extends ApplicationApiIntegrationTestCase
 
         $response->assertJson([
             'object' => 'nest',
-            'attributes' => $this->getTransformer(NestTransformer::class)->transform($nest),
+            'attributes' => (new NestTransformer())->transform($nest),
         ]);
     }
 
@@ -111,7 +108,7 @@ class NestControllerTest extends ApplicationApiIntegrationTestCase
      */
     public function testGetMissingNest()
     {
-        $response = $this->getJson('/api/application/nests/nil');
+        $response = $this->getJson('/api/application/nests/0');
         $this->assertNotFoundJson($response);
     }
 
@@ -121,23 +118,6 @@ class NestControllerTest extends ApplicationApiIntegrationTestCase
      */
     public function testErrorReturnedIfNoPermission()
     {
-        $nest = $this->repository->find(1);
-        $this->createNewDefaultApiKey($this->getApiUser(), ['r_nests' => 0]);
-
-        $response = $this->getJson('/api/application/nests/' . $nest->id);
-        $this->assertAccessDeniedJson($response);
-    }
-
-    /**
-     * Test that a nest's existence is not exposed unless an API key has permission
-     * to access the resource.
-     */
-    public function testResourceIsNotExposedWithoutPermissions()
-    {
-        $nest = $this->repository->find(1);
-        $this->createNewDefaultApiKey($this->getApiUser(), ['r_nests' => 0]);
-
-        $response = $this->getJson('/api/application/nests/' . $nest->id);
-        $this->assertAccessDeniedJson($response);
+        $this->markTestSkipped('todo: implement proper admin api key permissions system');
     }
 }

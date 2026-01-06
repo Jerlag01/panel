@@ -1,75 +1,81 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFileImport } from '@fortawesome/free-solid-svg-icons/faFileImport';
-import { faFileAlt } from '@fortawesome/free-solid-svg-icons/faFileAlt';
-import { faFolder } from '@fortawesome/free-solid-svg-icons/faFolder';
-import { bytesToHuman } from '@/helpers';
-import differenceInHours from 'date-fns/difference_in_hours';
-import format from 'date-fns/format';
-import distanceInWordsToNow from 'date-fns/distance_in_words_to_now';
-import React from 'react';
-import { FileObject } from '@/api/server/files/loadDirectory';
-import FileDropdownMenu from '@/components/server/files/FileDropdownMenu';
-import { ServerContext } from '@/state/server';
+import { faFileAlt, faFileArchive, faFileImport, faFolder } from '@fortawesome/free-solid-svg-icons';
+import { differenceInHours, format, formatDistanceToNow } from 'date-fns';
+import type { ReactNode } from 'react';
+import { memo } from 'react';
+import isEqual from 'react-fast-compare';
 import { NavLink } from 'react-router-dom';
-import useRouter from 'use-react-router';
+import tw from 'twin.macro';
+import { join } from 'pathe';
 
-export default ({ file }: { file: FileObject }) => {
+import type { FileObject } from '@/api/server/files/loadDirectory';
+import FileDropdownMenu from '@/components/server/files/FileDropdownMenu';
+import SelectFileCheckbox from '@/components/server/files/SelectFileCheckbox';
+import { encodePathSegments } from '@/helpers';
+import { bytesToString } from '@/lib/formatters';
+import { usePermissions } from '@/plugins/usePermissions';
+import { ServerContext } from '@/state/server';
+import styles from './style.module.css';
+
+function Clickable({ file, children }: { file: FileObject; children: ReactNode }) {
+    const [canRead] = usePermissions(['file.read']);
+    const [canReadContents] = usePermissions(['file.read-content']);
+    const id = ServerContext.useStoreState(state => state.server.data!.id);
     const directory = ServerContext.useStoreState(state => state.files.directory);
-    const setDirectory = ServerContext.useStoreActions(actions => actions.files.setDirectory);
-    const { match } = useRouter();
 
+    return (file.isFile && (!file.isEditable() || !canReadContents)) || (!file.isFile && !canRead) ? (
+        <div className={styles.details}>{children}</div>
+    ) : (
+        <NavLink
+            className={styles.details}
+            to={`/server/${id}/files${file.isFile ? '/edit' : '#'}${encodePathSegments(join(directory, file.name))}`}
+        >
+            {children}
+        </NavLink>
+    );
+}
+
+const MemoizedClickable = memo(Clickable, isEqual);
+
+function FileObjectRow({ file }: { file: FileObject }) {
     return (
         <div
+            className={styles.file_row}
             key={file.name}
-            className={`
-                flex bg-neutral-700 rounded-sm mb-px text-sm
-                hover:text-neutral-100 cursor-pointer items-center no-underline hover:bg-neutral-600
-            `}
+            onContextMenu={e => {
+                e.preventDefault();
+                window.dispatchEvent(new CustomEvent(`pterodactyl:files:ctx:${file.key}`, { detail: e.clientX }));
+            }}
         >
-            <NavLink
-                to={`${match.url}/${file.isFile ? 'edit/' : ''}#${directory}/${file.name}`}
-                className={'flex flex-1 text-neutral-300 no-underline p-3'}
-                onClick={e => {
-                    // Don't rely on the onClick to work with the generated URL. Because of the way this
-                    // component re-renders you'll get redirected into a nested directory structure since
-                    // it'll cause the directory variable to update right away when you click.
-                    //
-                    // Just trust me future me, leave this be.
-                    if (!file.isFile) {
-                        e.preventDefault();
-
-                        window.location.hash = `#${directory}/${file.name}`;
-                        setDirectory(`${directory}/${file.name}`);
-                    }
-                }}
-            >
-                <div className={'flex-none text-neutral-400 mr-4 text-lg pl-3'}>
-                    {file.isFile ?
-                        <FontAwesomeIcon icon={file.isSymlink ? faFileImport : faFileAlt}/>
-                        :
-                        <FontAwesomeIcon icon={faFolder}/>
-                    }
+            <SelectFileCheckbox name={file.name} />
+            <MemoizedClickable file={file}>
+                <div css={tw`flex-none text-neutral-400 ml-6 mr-4 text-lg pl-3`}>
+                    {file.isFile ? (
+                        <FontAwesomeIcon
+                            icon={file.isSymlink ? faFileImport : file.isArchiveType() ? faFileArchive : faFileAlt}
+                        />
+                    ) : (
+                        <FontAwesomeIcon icon={faFolder} />
+                    )}
                 </div>
-                <div className={'flex-1'}>
-                    {file.name}
+                <div css={tw`flex-1 truncate`}>{file.name}</div>
+                {file.isFile && <div css={tw`w-1/6 text-right mr-4 hidden sm:block`}>{bytesToString(file.size)}</div>}
+                <div css={tw`w-1/5 text-right mr-4 hidden md:block`} title={file.modifiedAt.toString()}>
+                    {Math.abs(differenceInHours(file.modifiedAt, new Date())) > 48
+                        ? format(file.modifiedAt, 'MMM do, yyyy h:mma')
+                        : formatDistanceToNow(file.modifiedAt, { addSuffix: true })}
                 </div>
-                {file.isFile &&
-                <div className={'w-1/6 text-right mr-4'}>
-                    {bytesToHuman(file.size)}
-                </div>
-                }
-                <div
-                    className={'w-1/5 text-right mr-4'}
-                    title={file.modifiedAt.toString()}
-                >
-                    {Math.abs(differenceInHours(file.modifiedAt, new Date())) > 48 ?
-                        format(file.modifiedAt, 'MMM Do, YYYY h:mma')
-                        :
-                        distanceInWordsToNow(file.modifiedAt, { addSuffix: true })
-                    }
-                </div>
-            </NavLink>
-            <FileDropdownMenu uuid={file.uuid}/>
+            </MemoizedClickable>
+            <FileDropdownMenu file={file} />
         </div>
     );
-};
+}
+
+export default memo(FileObjectRow, (prevProps, nextProps) => {
+    /* eslint-disable @typescript-eslint/no-unused-vars */
+    const { isArchiveType, isEditable, ...prevFile } = prevProps.file;
+    const { isArchiveType: nextIsArchiveType, isEditable: nextIsEditable, ...nextFile } = nextProps.file;
+    /* eslint-enable @typescript-eslint/no-unused-vars */
+
+    return isEqual(prevFile, nextFile);
+});

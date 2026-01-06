@@ -15,10 +15,8 @@ class SettingsServiceProvider extends ServiceProvider
     /**
      * An array of configuration keys to override with database values
      * if they exist.
-     *
-     * @var array
      */
-    protected $keys = [
+    protected array $keys = [
         'app:name',
         'app:locale',
         'recaptcha:enabled',
@@ -29,47 +27,41 @@ class SettingsServiceProvider extends ServiceProvider
         'pterodactyl:console:count',
         'pterodactyl:console:frequency',
         'pterodactyl:auth:2fa_required',
+        'pterodactyl:client_features:allocations:enabled',
+        'pterodactyl:client_features:allocations:range_start',
+        'pterodactyl:client_features:allocations:range_end',
     ];
 
     /**
      * Keys specific to the mail driver that are only grabbed from the database
      * when using the SMTP driver.
-     *
-     * @var array
      */
-    protected $emailKeys = [
-        'mail:host',
-        'mail:port',
+    protected array $emailKeys = [
+        'mail:mailers:smtp:host',
+        'mail:mailers:smtp:port',
+        'mail:mailers:smtp:encryption',
+        'mail:mailers:smtp:username',
+        'mail:mailers:smtp:password',
         'mail:from:address',
         'mail:from:name',
-        'mail:encryption',
-        'mail:username',
-        'mail:password',
     ];
 
     /**
      * Keys that are encrypted and should be decrypted when set in the
      * configuration array.
-     *
-     * @var array
      */
-    protected static $encrypted = [
-        'mail:password',
+    protected static array $encrypted = [
+        'mail:mailers:smtp:password',
     ];
 
     /**
      * Boot the service provider.
-     *
-     * @param \Illuminate\Contracts\Config\Repository $config
-     * @param \Illuminate\Contracts\Encryption\Encrypter $encrypter
-     * @param \Psr\Log\LoggerInterface $log
-     * @param \Pterodactyl\Contracts\Repository\SettingsRepositoryInterface $settings
      */
-    public function boot(ConfigRepository $config, Encrypter $encrypter, Log $log, SettingsRepositoryInterface $settings)
+    public function boot(ConfigRepository $config, Encrypter $encrypter, Log $log, SettingsRepositoryInterface $settings): void
     {
         // Only set the email driver settings from the database if we
         // are configured using SMTP as the driver.
-        if ($config->get('mail.driver') === 'smtp') {
+        if ($config->get('mail.default') === 'smtp') {
             $this->keys = array_merge($this->keys, $this->emailKeys);
         }
 
@@ -88,7 +80,7 @@ class SettingsServiceProvider extends ServiceProvider
             if (in_array($key, self::$encrypted)) {
                 try {
                     $value = $encrypter->decrypt($value);
-                } catch (DecryptException $exception) {
+                } catch (DecryptException) {
                 }
             }
 
@@ -114,9 +106,6 @@ class SettingsServiceProvider extends ServiceProvider
         }
     }
 
-    /**
-     * @return array
-     */
     public static function getEncryptedKeys(): array
     {
         return self::$encrypted;

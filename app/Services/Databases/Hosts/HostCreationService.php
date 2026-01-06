@@ -12,58 +12,19 @@ use Pterodactyl\Contracts\Repository\DatabaseHostRepositoryInterface;
 class HostCreationService
 {
     /**
-     * @var \Illuminate\Database\ConnectionInterface
-     */
-    private $connection;
-
-    /**
-     * @var \Illuminate\Database\DatabaseManager
-     */
-    private $databaseManager;
-
-    /**
-     * @var \Pterodactyl\Extensions\DynamicDatabaseConnection
-     */
-    private $dynamic;
-
-    /**
-     * @var \Illuminate\Contracts\Encryption\Encrypter
-     */
-    private $encrypter;
-
-    /**
-     * @var \Pterodactyl\Contracts\Repository\DatabaseHostRepositoryInterface
-     */
-    private $repository;
-
-    /**
      * HostCreationService constructor.
-     *
-     * @param \Illuminate\Database\ConnectionInterface $connection
-     * @param \Illuminate\Database\DatabaseManager $databaseManager
-     * @param \Pterodactyl\Contracts\Repository\DatabaseHostRepositoryInterface $repository
-     * @param \Pterodactyl\Extensions\DynamicDatabaseConnection $dynamic
-     * @param \Illuminate\Contracts\Encryption\Encrypter $encrypter
      */
     public function __construct(
-        ConnectionInterface $connection,
-        DatabaseManager $databaseManager,
-        DatabaseHostRepositoryInterface $repository,
-        DynamicDatabaseConnection $dynamic,
-        Encrypter $encrypter
+        private ConnectionInterface $connection,
+        private DatabaseManager $databaseManager,
+        private DynamicDatabaseConnection $dynamic,
+        private Encrypter $encrypter,
+        private DatabaseHostRepositoryInterface $repository
     ) {
-        $this->connection = $connection;
-        $this->databaseManager = $databaseManager;
-        $this->dynamic = $dynamic;
-        $this->encrypter = $encrypter;
-        $this->repository = $repository;
     }
 
     /**
      * Create a new database host on the Panel.
-     *
-     * @param array $data
-     * @return \Pterodactyl\Models\DatabaseHost
      *
      * @throws \Throwable
      */

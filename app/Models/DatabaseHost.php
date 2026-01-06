@@ -2,79 +2,79 @@
 
 namespace Pterodactyl\Models;
 
-class DatabaseHost extends Validable
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+
+/**
+ * @property int $id
+ * @property string $name
+ * @property string $host
+ * @property int $port
+ * @property string $username
+ * @property string $password
+ * @property int|null $max_databases
+ * @property \Carbon\CarbonImmutable $created_at
+ * @property \Carbon\CarbonImmutable $updated_at
+ */
+class DatabaseHost extends Model
 {
     /**
      * The resource name for this model when it is transformed into an
      * API representation using fractal.
      */
-    const RESOURCE_NAME = 'database_host';
+    public const RESOURCE_NAME = 'database_host';
+
+    protected bool $immutableDates = true;
 
     /**
      * The table associated with the model.
-     *
-     * @var string
      */
     protected $table = 'database_hosts';
 
     /**
      * The attributes excluded from the model's JSON form.
-     *
-     * @var array
      */
     protected $hidden = ['password'];
 
     /**
      * Fields that are mass assignable.
-     *
-     * @var array
      */
     protected $fillable = [
-        'name', 'host', 'port', 'username', 'password', 'max_databases', 'node_id',
+        'name', 'host', 'port', 'username', 'password', 'max_databases',
     ];
 
     /**
      * Cast values to correct type.
-     *
-     * @var array
      */
     protected $casts = [
         'id' => 'integer',
         'max_databases' => 'integer',
-        'node_id' => 'integer',
     ];
 
     /**
      * Validation rules to assign to this model.
-     *
-     * @var array
      */
-    public static $validationRules = [
-        'name' => 'required|string|max:255',
-        'host' => 'required|ip|unique:database_hosts,host',
+    public static array $validationRules = [
+        'name' => 'required|string|max:191',
+        'host' => 'required|string',
         'port' => 'required|numeric|between:1,65535',
         'username' => 'required|string|max:32',
         'password' => 'nullable|string',
-        'node_id' => 'sometimes|nullable|integer|exists:nodes,id',
     ];
 
     /**
-     * Gets the node associated with a database host.
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * Gets the databases associated with this host.
      */
-    public function node()
+    public function databases(): HasMany
     {
-        return $this->belongsTo(Node::class);
+        return $this->hasMany(Database::class);
     }
 
     /**
-     * Gets the databases associated with this host.
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * Returns the nodes that a database host is assigned to.
      */
-    public function databases()
+    public function nodes(): BelongsToMany
     {
-        return $this->hasMany(Database::class);
+        return $this->belongsToMany(Node::class);
     }
 }

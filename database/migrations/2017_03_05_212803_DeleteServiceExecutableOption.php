@@ -9,22 +9,20 @@ class DeleteServiceExecutableOption extends Migration
     /**
      * Run the migrations.
      */
-    public function up()
+    public function up(): void
     {
-        DB::transaction(function () {
-            Schema::table('services', function (Blueprint $table) {
-                $table->renameColumn('file', 'folder');
-                $table->dropColumn('executable');
-                $table->text('description')->nullable()->change();
-                $table->text('startup')->nullable()->change();
-            });
+        Schema::table('services', function (Blueprint $table) {
+            $table->renameColumn('file', 'folder');
+            $table->dropColumn('executable');
+            $table->text('description')->nullable()->change();
+            $table->text('startup')->nullable()->change();
         });
     }
 
     /**
      * Reverse the migrations.
      */
-    public function down()
+    public function down(): void
     {
         Schema::table('services', function (Blueprint $table) {
             $table->string('executable')->after('folder');

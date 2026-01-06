@@ -10,19 +10,14 @@ class SessionRepository extends EloquentRepository implements SessionRepositoryI
 {
     /**
      * Return the model backing this repository.
-     *
-     * @return string
      */
-    public function model()
+    public function model(): string
     {
         return Session::class;
     }
 
     /**
-     * Return all of the active sessions for a user.
-     *
-     * @param int $user
-     * @return \Illuminate\Support\Collection
+     * Return all the active sessions for a user.
      */
     public function getUserSessions(int $user): Collection
     {
@@ -31,12 +26,8 @@ class SessionRepository extends EloquentRepository implements SessionRepositoryI
 
     /**
      * Delete a session for a given user.
-     *
-     * @param int $user
-     * @param string $session
-     * @return null|int
      */
-    public function deleteUserSession(int $user, string $session)
+    public function deleteUserSession(int $user, string $session): ?int
     {
         return $this->getBuilder()->where('user_id', $user)->where('id', $session)->delete();
     }

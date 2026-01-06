@@ -7,22 +7,14 @@ use Pterodactyl\Contracts\Repository\SettingsRepositoryInterface;
 
 class SettingsRepository extends EloquentRepository implements SettingsRepositoryInterface
 {
-    /**
-     * @var array
-     */
-    private static $cache = [];
+    private static array $cache = [];
 
-    /**
-     * @var array
-     */
-    private static $databaseMiss = [];
+    private static array $databaseMiss = [];
 
     /**
      * Return the model backing this repository.
-     *
-     * @return string
      */
-    public function model()
+    public function model(): string
     {
         return Setting::class;
     }
@@ -30,11 +22,7 @@ class SettingsRepository extends EloquentRepository implements SettingsRepositor
     /**
      * Store a new persistent setting in the database.
      *
-     * @param string $key
-     * @param string|null $value
-     *
      * @throws \Pterodactyl\Exceptions\Model\DataValidationException
-     * @throws \Pterodactyl\Exceptions\Repository\RecordNotFoundException
      */
     public function set(string $key, string $value = null)
     {
@@ -47,12 +35,8 @@ class SettingsRepository extends EloquentRepository implements SettingsRepositor
 
     /**
      * Retrieve a persistent setting from the database.
-     *
-     * @param string $key
-     * @param mixed $default
-     * @return mixed
      */
-    public function get(string $key, $default = null)
+    public function get(string $key, mixed $default = null): mixed
     {
         // If item has already been requested return it from the cache. If
         // we already know it is missing, immediately return the default value.
@@ -62,6 +46,7 @@ class SettingsRepository extends EloquentRepository implements SettingsRepositor
             return value($default);
         }
 
+        /** @var Setting $instance */
         $instance = $this->getBuilder()->where('key', $key)->first();
         if (is_null($instance)) {
             self::$databaseMiss[$key] = true;
@@ -74,8 +59,6 @@ class SettingsRepository extends EloquentRepository implements SettingsRepositor
 
     /**
      * Remove a key from the database cache.
-     *
-     * @param string $key
      */
     public function forget(string $key)
     {
@@ -85,8 +68,6 @@ class SettingsRepository extends EloquentRepository implements SettingsRepositor
 
     /**
      * Remove a key from the cache.
-     *
-     * @param string $key
      */
     private function clearCache(string $key)
     {

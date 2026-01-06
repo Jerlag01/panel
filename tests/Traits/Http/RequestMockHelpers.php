@@ -1,31 +1,23 @@
 <?php
 
-namespace Tests\Traits\Http;
+namespace Pterodactyl\Tests\Traits\Http;
 
 use Mockery as m;
+use Mockery\Mock;
 use Illuminate\Http\Request;
 use Pterodactyl\Models\User;
-use InvalidArgumentException;
 use Symfony\Component\HttpFoundation\ParameterBag;
 
 trait RequestMockHelpers
 {
-    /**
-     * @var string
-     */
-    private $requestMockClass = Request::class;
+    private string $requestMockClass = Request::class;
 
-    /**
-     * @var \Illuminate\Http\Request|\Mockery\Mock
-     */
-    protected $request;
+    protected Request|Mock $request;
 
     /**
      * Set the class to mock for requests.
-     *
-     * @param string $class
      */
-    public function setRequestMockClass(string $class)
+    public function setRequestMockClass(string $class): void
     {
         $this->requestMockClass = $class;
 
@@ -34,23 +26,19 @@ trait RequestMockHelpers
 
     /**
      * Configure the user model that the request mock should return with.
-     *
-     * @param \Pterodactyl\Models\User|null $user
      */
-    public function setRequestUserModel(User $user = null)
+    public function setRequestUserModel(User $user = null): void
     {
         $this->request->shouldReceive('user')->andReturn($user);
     }
 
     /**
      * Generates a new request user model and also returns the generated model.
-     *
-     * @param array $args
-     * @return \Pterodactyl\Models\User
      */
     public function generateRequestUserModel(array $args = []): User
     {
-        $user = factory(User::class)->make($args);
+        /** @var \Pterodactyl\Models\User $user */
+        $user = User::factory()->make($args);
         $this->setRequestUserModel($user);
 
         return $user;
@@ -58,21 +46,16 @@ trait RequestMockHelpers
 
     /**
      * Set a request attribute on the mock object.
-     *
-     * @param string $attribute
-     * @param mixed  $value
      */
-    public function setRequestAttribute(string $attribute, $value)
+    public function setRequestAttribute(string $attribute, mixed $value): void
     {
         $this->request->attributes->set($attribute, $value);
     }
 
     /**
      * Set the request route name.
-     *
-     * @param string $name
      */
-    public function setRequestRouteName(string $name)
+    public function setRequestRouteName(string $name): void
     {
         $this->request->shouldReceive('route->getName')->andReturn($name);
     }
@@ -80,11 +63,11 @@ trait RequestMockHelpers
     /**
      * Set the active request object to be an instance of a mocked request.
      */
-    protected function buildRequestMock()
+    protected function buildRequestMock(): void
     {
         $this->request = m::mock($this->requestMockClass);
-        if (! $this->request instanceof Request) {
-            throw new InvalidArgumentException('Request mock class must be an instance of ' . Request::class . ' when mocked.');
+        if (!$this->request instanceof Request) {
+            throw new \InvalidArgumentException('Request mock class must be an instance of ' . Request::class . ' when mocked.');
         }
 
         $this->request->attributes = new ParameterBag();
@@ -94,13 +77,11 @@ trait RequestMockHelpers
      * Sets the mocked request user. If a user model is not provided, a factory model
      * will be created and returned.
      *
-     * @param \Pterodactyl\Models\User|null $user
-     * @return \Pterodactyl\Models\User
      * @deprecated
      */
     protected function setRequestUser(User $user = null): User
     {
-        $user = $user instanceof User ? $user : factory(User::class)->make();
+        $user = $user instanceof User ? $user : User::factory()->make();
         $this->request->shouldReceive('user')->withNoArgs()->andReturn($user);
 
         return $user;

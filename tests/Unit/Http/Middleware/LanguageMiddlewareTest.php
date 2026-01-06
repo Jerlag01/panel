@@ -1,23 +1,21 @@
 <?php
 
-namespace Tests\Unit\Http\Middleware;
+namespace Pterodactyl\Tests\Unit\Http\Middleware;
 
 use Mockery as m;
+use Mockery\MockInterface;
 use Pterodactyl\Models\User;
 use Illuminate\Foundation\Application;
 use Pterodactyl\Http\Middleware\LanguageMiddleware;
 
 class LanguageMiddlewareTest extends MiddlewareTestCase
 {
-    /**
-     * @var \Illuminate\Foundation\Application|\Mockery\Mock
-     */
-    private $appMock;
+    private MockInterface $appMock;
 
     /**
      * Setup tests.
      */
-    public function setUp()
+    public function setUp(): void
     {
         parent::setUp();
 
@@ -40,7 +38,7 @@ class LanguageMiddlewareTest extends MiddlewareTestCase
      */
     public function testLanguageIsSetWithAuthenticatedUser()
     {
-        $user = factory(User::class)->make(['language' => 'de']);
+        $user = User::factory()->make(['language' => 'de']);
 
         $this->request->shouldReceive('user')->withNoArgs()->andReturn($user);
         $this->appMock->shouldReceive('setLocale')->with('de')->once()->andReturnNull();
@@ -50,8 +48,6 @@ class LanguageMiddlewareTest extends MiddlewareTestCase
 
     /**
      * Return an instance of the middleware using mocked dependencies.
-     *
-     * @return \Pterodactyl\Http\Middleware\LanguageMiddleware
      */
     private function getMiddleware(): LanguageMiddleware
     {

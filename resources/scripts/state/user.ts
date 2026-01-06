@@ -8,6 +8,8 @@ export interface UserData {
     language: string;
     rootAdmin: boolean;
     useTotp: boolean;
+    avatarURL: string;
+    roleName: string;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -16,7 +18,7 @@ export interface UserStore {
     data?: UserData;
     setUserData: Action<UserStore, UserData>;
     updateUserData: Action<UserStore, Partial<UserData>>;
-    updateUserEmail: Thunk<UserStore, { email: string; password: string }, any, {}, Promise<void>>;
+    updateUserEmail: Thunk<UserStore, { email: string; password: string }, any, UserStore, Promise<void>>;
 }
 
 const user: UserStore = {
@@ -26,8 +28,7 @@ const user: UserStore = {
     }),
 
     updateUserData: action((state, payload) => {
-        // Limitation of Typescript, can't do much about that currently unfortunately.
-        // @ts-ignore
+        // @ts-expect-error limitation of Typescript, can't do much about that currently unfortunately.
         state.data = { ...state.data, ...payload };
     }),
 

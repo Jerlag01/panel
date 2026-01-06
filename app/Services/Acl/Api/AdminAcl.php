@@ -2,7 +2,6 @@
 
 namespace Pterodactyl\Services\Acl\Api;
 
-use ReflectionClass;
 use Pterodactyl\Models\ApiKey;
 
 class AdminAcl
@@ -11,39 +10,34 @@ class AdminAcl
      * Resource permission columns in the api_keys table begin
      * with this identifier.
      */
-    const COLUMN_IDENTIFIER = 'r_';
+    public const COLUMN_IDENTIFIER = 'r_';
 
     /**
      * The different types of permissions available for API keys. This
      * implements a read/write/none permissions scheme for all endpoints.
      */
-    const NONE = 0;
-    const READ = 1;
-    const WRITE = 2;
+    public const NONE = 0;
+    public const READ = 1;
+    public const WRITE = 2;
 
     /**
      * Resources that are available on the API and can contain a permissions
      * set for each key. These are stored in the database as r_{resource}.
      */
-    const RESOURCE_SERVERS = 'servers';
-    const RESOURCE_NODES = 'nodes';
-    const RESOURCE_ALLOCATIONS = 'allocations';
-    const RESOURCE_USERS = 'users';
-    const RESOURCE_LOCATIONS = 'locations';
-    const RESOURCE_NESTS = 'nests';
-    const RESOURCE_EGGS = 'eggs';
-    const RESOURCE_DATABASE_HOSTS = 'database_hosts';
-    const RESOURCE_SERVER_DATABASES = 'server_databases';
-    const RESOURCE_PACKS = 'packs';
+    public const RESOURCE_SERVERS = 'servers';
+    public const RESOURCE_NODES = 'nodes';
+    public const RESOURCE_ALLOCATIONS = 'allocations';
+    public const RESOURCE_USERS = 'users';
+    public const RESOURCE_LOCATIONS = 'locations';
+    public const RESOURCE_NESTS = 'nests';
+    public const RESOURCE_EGGS = 'eggs';
+    public const RESOURCE_DATABASE_HOSTS = 'database_hosts';
+    public const RESOURCE_SERVER_DATABASES = 'server_databases';
 
     /**
      * Determine if an API key has permission to perform a specific read/write operation.
-     *
-     * @param int $permission
-     * @param int $action
-     * @return bool
      */
-    public static function can(int $permission, int $action = self::READ)
+    public static function can(int $permission, int $action = self::READ): bool
     {
         if ($permission & $action) {
             return true;
@@ -55,13 +49,8 @@ class AdminAcl
     /**
      * Determine if an API Key model has permission to access a given resource
      * at a specific action level.
-     *
-     * @param \Pterodactyl\Models\ApiKey $key
-     * @param string $resource
-     * @param int $action
-     * @return bool
      */
-    public static function check(ApiKey $key, string $resource, int $action = self::READ)
+    public static function check(ApiKey $key, string $resource, int $action = self::READ): bool
     {
         return self::can(data_get($key, self::COLUMN_IDENTIFIER . $resource, self::NONE), $action);
     }
@@ -69,12 +58,11 @@ class AdminAcl
     /**
      * Return a list of all resource constants defined in this ACL.
      *
-     * @return array
      * @throws \ReflectionException
      */
     public static function getResourceList(): array
     {
-        $reflect = new ReflectionClass(__CLASS__);
+        $reflect = new \ReflectionClass(__CLASS__);
 
         return collect($reflect->getConstants())->filter(function ($value, $key) {
             return substr($key, 0, 9) === 'RESOURCE_';

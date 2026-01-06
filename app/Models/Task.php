@@ -2,9 +2,27 @@
 
 namespace Pterodactyl\Models;
 
+use Illuminate\Container\Container;
 use Znck\Eloquent\Traits\BelongsToThrough;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Pterodactyl\Contracts\Extensions\HashidsInterface;
 
-class Task extends Validable
+/**
+ * @property int $id
+ * @property int $schedule_id
+ * @property int $sequence_id
+ * @property string $action
+ * @property string $payload
+ * @property int $time_offset
+ * @property bool $is_queued
+ * @property bool $continue_on_failure
+ * @property \Carbon\Carbon $created_at
+ * @property \Carbon\Carbon $updated_at
+ * @property string $hashid
+ * @property \Pterodactyl\Models\Schedule $schedule
+ * @property \Pterodactyl\Models\Server $server
+ */
+class Task extends Model
 {
     use BelongsToThrough;
 
@@ -12,26 +30,27 @@ class Task extends Validable
      * The resource name for this model when it is transformed into an
      * API representation using fractal.
      */
-    const RESOURCE_NAME = 'schedule_task';
+    public const RESOURCE_NAME = 'schedule_task';
+
+    /**
+     * The default actions that can exist for a task in Pterodactyl.
+     */
+    public const ACTION_POWER = 'power';
+    public const ACTION_COMMAND = 'command';
+    public const ACTION_BACKUP = 'backup';
 
     /**
      * The table associated with the model.
-     *
-     * @var string
      */
     protected $table = 'tasks';
 
     /**
      * Relationships to be updated when this model is updated.
-     *
-     * @var array
      */
     protected $touches = ['schedule'];
 
     /**
      * Fields that are mass assignable.
-     *
-     * @var array
      */
     protected $fillable = [
         'schedule_id',
@@ -40,12 +59,11 @@ class Task extends Validable
         'payload',
         'time_offset',
         'is_queued',
+        'continue_on_failure',
     ];
 
     /**
      * Cast values to correct type.
-     *
-     * @var array
      */
     protected $casts = [
         'id' => 'integer',
@@ -53,56 +71,56 @@ class Task extends Validable
         'sequence_id' => 'integer',
         'time_offset' => 'integer',
         'is_queued' => 'boolean',
+        'continue_on_failure' => 'boolean',
     ];
 
     /**
      * Default attributes when creating a new model.
-     *
-     * @var array
      */
     protected $attributes = [
+        'time_offset' => 0,
         'is_queued' => false,
+        'continue_on_failure' => false,
     ];
 
-    /**
-     * @var array
-     */
-    public static $validationRules = [
+    public static array $validationRules = [
         'schedule_id' => 'required|numeric|exists:schedules,id',
         'sequence_id' => 'required|numeric|min:1',
         'action' => 'required|string',
-        'payload' => 'required|string',
+        'payload' => 'required_unless:action,backup|string',
         'time_offset' => 'required|numeric|between:0,900',
         'is_queued' => 'boolean',
+        'continue_on_failure' => 'boolean',
     ];
 
     /**
-     * Return a hashid encoded string to represent the ID of the task.
-     *
-     * @return string
+     * {@inheritDoc}
      */
-    public function getHashidAttribute()
+    public function getRouteKeyName(): string
     {
-        return app()->make('hashids')->encode($this->id);
+        return $this->getKeyName();
+    }
+
+    /**
+     * Return a hashid encoded string to represent the ID of the task.
+     */
+    public function getHashidAttribute(): string
+    {
+        return Container::getInstance()->make(HashidsInterface::class)->encode($this->id);
     }
 
     /**
      * Return the schedule that a task belongs to.
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
      */
-    public function schedule()
+    public function schedule(): BelongsTo
     {
         return $this->belongsTo(Schedule::class);
     }
 
     /**
      * Return the server a task is assigned to, acts as a belongsToThrough.
-     *
-     * @return \Znck\Eloquent\Relations\BelongsToThrough
-     * @throws \Exception
      */
-    public function server()
+    public function server(): \Znck\Eloquent\Relations\BelongsToThrough
     {
         return $this->belongsToThrough(Server::class, Schedule::class);
     }

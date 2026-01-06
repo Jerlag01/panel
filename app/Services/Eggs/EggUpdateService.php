@@ -1,11 +1,4 @@
 <?php
-/**
- * Pterodactyl - Panel
- * Copyright (c) 2015 - 2017 Dane Everitt <dane@daneeveritt.com>.
- *
- * This software is licensed under the terms of the MIT license.
- * https://opensource.org/licenses/MIT
- */
 
 namespace Pterodactyl\Services\Eggs;
 
@@ -16,37 +9,22 @@ use Pterodactyl\Exceptions\Service\Egg\NoParentConfigurationFoundException;
 class EggUpdateService
 {
     /**
-     * @var \Pterodactyl\Contracts\Repository\EggRepositoryInterface
-     */
-    protected $repository;
-
-    /**
      * EggUpdateService constructor.
-     *
-     * @param \Pterodactyl\Contracts\Repository\EggRepositoryInterface $repository
      */
-    public function __construct(EggRepositoryInterface $repository)
+    public function __construct(protected EggRepositoryInterface $repository)
     {
-        $this->repository = $repository;
     }
 
     /**
      * Update a service option.
      *
-     * @param int|\Pterodactyl\Models\Egg $egg
-     * @param array $data
-     *
      * @throws \Pterodactyl\Exceptions\Model\DataValidationException
      * @throws \Pterodactyl\Exceptions\Repository\RecordNotFoundException
      * @throws \Pterodactyl\Exceptions\Service\Egg\NoParentConfigurationFoundException
      */
-    public function handle($egg, array $data)
+    public function handle(Egg $egg, array $data): void
     {
-        if (! $egg instanceof Egg) {
-            $egg = $this->repository->find($egg);
-        }
-
-        if (! is_null(array_get($data, 'config_from'))) {
+        if (!is_null(array_get($data, 'config_from'))) {
             $results = $this->repository->findCountWhere([
                 ['nest_id', '=', $egg->nest_id],
                 ['id', '=', array_get($data, 'config_from')],
@@ -56,6 +34,10 @@ class EggUpdateService
                 throw new NoParentConfigurationFoundException(trans('exceptions.nest.egg.must_be_child'));
             }
         }
+
+        // TODO(dane): Once the admin UI is done being reworked and this is exposed
+        //  in said UI, remove this so that you can actually update the denylist.
+        unset($data['file_denylist']);
 
         $this->repository->withoutFreshModel()->update($egg->id, $data);
     }

@@ -2,29 +2,21 @@
 
 namespace Pterodactyl\Transformers\Api\Application;
 
-use Cake\Chronos\Chronos;
 use Pterodactyl\Models\Database;
 use League\Fractal\Resource\Item;
-use Pterodactyl\Models\DatabaseHost;
+use League\Fractal\Resource\NullResource;
 use Pterodactyl\Services\Acl\Api\AdminAcl;
+use Pterodactyl\Transformers\Api\Transformer;
 use Illuminate\Contracts\Encryption\Encrypter;
 
-class ServerDatabaseTransformer extends BaseTransformer
+class ServerDatabaseTransformer extends Transformer
 {
-    /**
-     * @var array
-     */
-    protected $availableIncludes = ['password', 'host'];
+    protected array $availableIncludes = ['host', 'password'];
 
-    /**
-     * @var Encrypter
-     */
-    private $encrypter;
+    private Encrypter $encrypter;
 
     /**
      * Perform dependency injection.
-     *
-     * @param \Illuminate\Contracts\Encryption\Encrypter $encrypter
      */
     public function handle(Encrypter $encrypter)
     {
@@ -33,8 +25,6 @@ class ServerDatabaseTransformer extends BaseTransformer
 
     /**
      * Return the resource name for the JSONAPI output.
-     *
-     * @return string
      */
     public function getResourceName(): string
     {
@@ -43,33 +33,36 @@ class ServerDatabaseTransformer extends BaseTransformer
 
     /**
      * Transform a database model in a representation for the application API.
-     *
-     * @param \Pterodactyl\Models\Database $model
-     * @return array
      */
     public function transform(Database $model): array
     {
         return [
             'id' => $model->id,
-            'server' => $model->server_id,
-            'host' => $model->database_host_id,
-            'database' => $model->database,
+            'database_host_id' => $model->database_host_id,
+            'server_id' => $model->server_id,
+            'name' => $model->database,
             'username' => $model->username,
             'remote' => $model->remote,
-            'created_at' => Chronos::createFromFormat(Chronos::DEFAULT_TO_STRING_FORMAT, $model->created_at)
-                ->setTimezone(config('app.timezone'))
-                ->toIso8601String(),
-            'updated_at' => Chronos::createFromFormat(Chronos::DEFAULT_TO_STRING_FORMAT, $model->updated_at)
-                ->setTimezone(config('app.timezone'))
-                ->toIso8601String(),
+            'max_connections' => $model->max_connections,
+            'created_at' => self::formatTimestamp($model->created_at),
+            'updated_at' => self::formatTimestamp($model->updated_at),
         ];
     }
 
     /**
+     * Return the database host relationship for this server database.
+     */
+    public function includeHost(Database $model): Item|NullResource
+    {
+        if (!$this->authorize(AdminAcl::RESOURCE_DATABASE_HOSTS)) {
+            return $this->null();
+        }
+
+        return $this->item($model->host, new DatabaseHostTransformer());
+    }
+
+    /**
      * Include the database password in the request.
-     *
-     * @param \Pterodactyl\Models\Database $model
-     * @return \League\Fractal\Resource\Item
      */
     public function includePassword(Database $model): Item
     {
@@ -78,27 +71,5 @@ class ServerDatabaseTransformer extends BaseTransformer
                 'password' => $this->encrypter->decrypt($model->password),
             ];
         }, 'database_password');
-    }
-
-    /**
-     * Return the database host relationship for this server database.
-     *
-     * @param \Pterodactyl\Models\Database $model
-     * @return \League\Fractal\Resource\Item|\League\Fractal\Resource\NullResource
-     * @throws \Pterodactyl\Exceptions\Transformer\InvalidTransformerLevelException
-     */
-    public function includeHost(Database $model)
-    {
-        if (! $this->authorize(AdminAcl::RESOURCE_DATABASE_HOSTS)) {
-            return $this->null();
-        }
-
-        $model->loadMissing('host');
-
-        return $this->item(
-            $model->getRelation('host'),
-            $this->makeTransformer(DatabaseHostTransformer::class),
-            DatabaseHost::RESOURCE_NAME
-        );
     }
 }

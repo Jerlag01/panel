@@ -1,26 +1,50 @@
 [![Logo Image](https://cdn.pterodactyl.io/logos/new/pterodactyl_logo.png)](https://pterodactyl.io)
 
-[![Build status](https://img.shields.io/travis/pterodactyl/panel/develop.svg?style=flat-square)](https://travis-ci.org/pterodactyl/panel)
-[![StyleCI](https://styleci.io/repos/47508644/shield?branch=develop)](https://styleci.io/repos/47508644)
-[![Codecov](https://img.shields.io/codecov/c/github/pterodactyl/panel/develop.svg?style=flat-square)](https://codecov.io/gh/Pterodactyl/Panel)
-[![Discord](https://img.shields.io/discord/122900397965705216.svg?style=flat-square&label=Discord)](https://pterodactyl.io/discord)
+![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/pterodactyl/panel/laravel.yaml?label=Tests&style=for-the-badge&branch=develop)
+![Discord](https://img.shields.io/discord/122900397965705216?label=Discord&logo=Discord&logoColor=white&style=for-the-badge)
+![GitHub Releases](https://img.shields.io/github/downloads/pterodactyl/panel/latest/total?style=for-the-badge)
+![GitHub contributors](https://img.shields.io/github/contributors/pterodactyl/panel?style=for-the-badge)
 
 # Pterodactyl Panel
 
-Pterodactyl is the open-source game server management panel built with PHP7, Nodejs, and Go. Designed with security in mind, Pterodactyl runs all game servers in isolated Docker containers while exposing a beautiful and intuitive UI to administrators and users.
-What more are you waiting for? Make game servers a first class citizen on your platform today.
+Pterodactyl® is a free, open-source game server management panel built with PHP, React, and Go. Designed with security
+in mind, Pterodactyl runs all game servers in isolated Docker containers while exposing a beautiful and intuitive
+UI to end users.
 
-![Image](https://cdn.pterodactyl.io/site-assets/mockup-macbook-grey.png)
+Stop settling for less. Make game servers a first class citizen on your platform.
 
-## Support & Documentation
-Support for using Pterodactyl can be found on our [Documentation Website](https://pterodactyl.io/project/introduction.html), [Guides Website](https://pterodactyl.io/community/about.html), or via our [Discord Chat](https://discord.gg/QRDZvVm).
+![Image](https://cdn.pterodactyl.io/site-assets/pterodactyl_v1_demo.gif)
+
+## Documentation
+
+* [Panel Documentation](https://pterodactyl.io/panel/1.0/getting_started.html)
+* [Wings Documentation](https://pterodactyl.io/wings/1.0/installing.html)
+* [Community Guides](https://pterodactyl.io/community/about.html)
+* Or, get additional help [via Discord](https://discord.gg/pterodactyl)
+
+## Sponsors
+
+I would like to extend my sincere thanks to the following sponsors for helping fund Pterodactyl's development.
+[Interested in becoming a sponsor?](https://github.com/sponsors/matthewpi)
+
+| Company                                                      | About                                                                                                                                                                                                                                           |
+|--------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| [**Aussie Server Hosts**](https://aussieserverhosts.com/)    | No frills Australian Owned and operated High Performance Server hosting for some of the most demanding games serving Australia and New Zealand.                                                                                                                       |
+| [**CodeNode LLC**](https://codenode.gg/)                     | Looking for simplicity? Well, look no further! CodeNode has got you covered with everything you need at the rock-bottom price of $1.75 per GB, including dedicated IPs in Dallas, Texas, and Amsterdam, Netherlands. We're not just good, we're the best in the game! |
+| [**BisectHosting**](https://www.bisecthosting.com/)          | BisectHosting provides Minecraft, Valheim and other server hosting services with the highest reliability and lightning fast support since 2012.                                                                                                                       |
+| [**MineStrator**](https://minestrator.com/)                  | Looking for the most highend French hosting company for your minecraft server? More than 24,000 members on our discord trust us. Give us a try!                                                                                                                       |
+| [**HostEZ**](https://hostez.io)                              | US & EU Rust & Minecraft Hosting. DDoS Protected bare metal, VPS and colocation with low latency, high uptime and maximum availability. EZ!                                                                                                                           |
+| [**Blueprint**](https://blueprint.zip/?pterodactyl=true)     | Create and install Pterodactyl addons and themes with the growing Blueprint framework - the package-manager for Pterodactyl. Use multiple modifications at once without worrying about conflicts and make use of the large extension ecosystem.                       |
+| [**indifferent broccoli**](https://indifferentbroccoli.com/) | indifferent broccoli is a game server hosting and rental company. With us, you get top-notch computer power for your gaming sessions. We destroy lag, latency, and complexity--letting you focus on the fun stuff.                                                    |
 
 ### Supported Games
-We support a huge variety of games by utilizing Docker containers to isolate each instance, giving you the power to host your games across the world without having to bloat each physical machine with additional dependencies.
+
+Pterodactyl supports a wide variety of games by utilizing Docker containers to isolate each instance. This gives
+you the power to run game servers without bloating machines with a host of additional dependencies.
 
 Some of our core supported games include:
 
-* Minecraft — including Spigot, Sponge, Bungeecord, Waterfall, and more
+* Minecraft — including Paper, Sponge, Bungeecord, Waterfall, and more
 * Rust
 * Terraria
 * Teamspeak
@@ -30,46 +54,20 @@ Some of our core supported games include:
 * Garry's Mod
 * ARK: Survival Evolved
 
-In addition to our standard nest of supported games, our community is constantly pushing the limits of this software and there are plenty more games available provided by the community. Some of these games include:
+In addition to our standard nest of supported games, our community is constantly pushing the limits of this software
+and there are plenty more games available provided by the community. Some of these games include:
 
 * Factorio
 * San Andreas: MP
 * Pocketmine MP
 * Squad
-* FiveM
 * Xonotic
-* Discord ATLBot
-
-## Credits
-This software would not be possible without the work of other open-source authors who provide tools such as:
-
-[Ace Editor](https://ace.c9.io), [AdminLTE](https://almsaeedstudio.com), [Animate.css](http://daneden.github.io/animate.css/), [AnsiUp](https://github.com/drudru/ansi_up), [Async.js](https://github.com/caolan/async), 
-[Bootstrap](http://getbootstrap.com), [Bootstrap Notify](http://bootstrap-notify.remabledesigns.com), [Chart.js](http://www.chartjs.org), [FontAwesome](http://fontawesome.io),
-[FontAwesome Animations](https://github.com/l-lin/font-awesome-animation), [jQuery](http://jquery.com), [Laravel](https://laravel.com), [Lodash](https://lodash.com),
-[Select2](https://select2.github.io), [Socket.io](http://socket.io), [Socket.io File Upload](https://github.com/vote539/socketio-file-upload), [SweetAlert](http://t4t5.github.io/sweetalert),
-[Typeahead](https://github.com/bassjobsen/Bootstrap-3-Typeahead), and [Particles.js](http://vincentgarreau.com/particles.js).
-
-Some Javascript and CSS used within the panel is licensed under a `MIT` or `Apache 2.0` license. Please check their respective header files for more information.
+* Starmade
+* Discord ATLBot, and most other Node.js/Python discord bots
+* [and many more...](https://github.com/parkervcp/eggs)
 
 ## License
-```
-Copyright (c) 2015 - 2018 Dane Everitt <dane@daneeveritt.com>.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Pterodactyl® Copyright © 2015 - 2022 Dane Everitt and contributors.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
+Code released under the [MIT License](./LICENSE.md).

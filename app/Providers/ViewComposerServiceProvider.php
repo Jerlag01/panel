@@ -4,21 +4,14 @@ namespace Pterodactyl\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Pterodactyl\Http\ViewComposers\AssetComposer;
-use Pterodactyl\Http\ViewComposers\ServerListComposer;
-use Pterodactyl\Http\ViewComposers\Server\ServerDataComposer;
 
 class ViewComposerServiceProvider extends ServiceProvider
 {
     /**
      * Register bindings in the container.
      */
-    public function boot()
+    public function boot(): void
     {
         $this->app->make('view')->composer('*', AssetComposer::class);
-
-        $this->app->make('view')->composer('server.*', ServerDataComposer::class);
-
-        // Add data to make the sidebar work when viewing a server.
-        $this->app->make('view')->composer(['server.*'], ServerListComposer::class);
     }
 }

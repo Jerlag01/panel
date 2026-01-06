@@ -1,39 +1,24 @@
 <?php
-/**
- * Pterodactyl - Panel
- * Copyright (c) 2015 - 2017 Dane Everitt <dane@daneeveritt.com>.
- *
- * This software is licensed under the terms of the MIT license.
- * https://opensource.org/licenses/MIT
- */
 
 namespace Pterodactyl\Services\Eggs\Sharing;
 
 use Carbon\Carbon;
+use Pterodactyl\Models\Egg;
+use Illuminate\Support\Collection;
+use Pterodactyl\Models\EggVariable;
 use Pterodactyl\Contracts\Repository\EggRepositoryInterface;
 
 class EggExporterService
 {
     /**
-     * @var \Pterodactyl\Contracts\Repository\EggRepositoryInterface
-     */
-    protected $repository;
-
-    /**
      * EggExporterService constructor.
-     *
-     * @param \Pterodactyl\Contracts\Repository\EggRepositoryInterface $repository
      */
-    public function __construct(EggRepositoryInterface $repository)
+    public function __construct(protected EggRepositoryInterface $repository)
     {
-        $this->repository = $repository;
     }
 
     /**
      * Return a JSON representation of an egg and its variables.
-     *
-     * @param int $egg
-     * @return string
      *
      * @throws \Pterodactyl\Exceptions\Repository\RecordNotFoundException
      */
@@ -44,18 +29,22 @@ class EggExporterService
         $struct = [
             '_comment' => 'DO NOT EDIT: FILE GENERATED AUTOMATICALLY BY PTERODACTYL PANEL - PTERODACTYL.IO',
             'meta' => [
-                'version' => 'PTDL_v1',
+                'version' => Egg::EXPORT_VERSION,
+                'update_url' => $egg->update_url,
             ],
-            'exported_at' => Carbon::now()->toIso8601String(),
+            'exported_at' => Carbon::now()->toAtomString(),
             'name' => $egg->name,
             'author' => $egg->author,
             'description' => $egg->description,
-            'image' => $egg->docker_image,
+            'features' => $egg->features,
+            'docker_images' => $egg->docker_images,
+            'file_denylist' => Collection::make($egg->inherit_file_denylist)->filter(function ($value) {
+                return !empty($value);
+            }),
             'startup' => $egg->startup,
             'config' => [
                 'files' => $egg->inherit_config_files,
                 'startup' => $egg->inherit_config_startup,
-                'logs' => $egg->inherit_config_logs,
                 'stop' => $egg->inherit_config_stop,
             ],
             'scripts' => [
@@ -65,10 +54,11 @@ class EggExporterService
                     'entrypoint' => $egg->copy_script_entry,
                 ],
             ],
-            'variables' => $egg->variables->transform(function ($item) {
-                return collect($item->toArray())->except([
-                    'id', 'egg_id', 'created_at', 'updated_at',
-                ])->toArray();
+            'variables' => $egg->variables->transform(function (EggVariable $item) {
+                return Collection::make($item->toArray())
+                    ->except(['id', 'egg_id', 'created_at', 'updated_at'])
+                    ->merge(['field_type' => 'text'])
+                    ->toArray();
             }),
         ];
 

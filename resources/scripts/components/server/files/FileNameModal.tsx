@@ -1,10 +1,14 @@
-import React from 'react';
-import Modal, { RequiredModalProps } from '@/components/elements/Modal';
-import { Form, Formik, FormikActions } from 'formik';
+import type { FormikHelpers } from 'formik';
+import { Form, Formik } from 'formik';
+import { join } from 'pathe';
+import tw from 'twin.macro';
 import { object, string } from 'yup';
+
+import { Button } from '@/components/elements/button';
 import Field from '@/components/elements/Field';
+import type { RequiredModalProps } from '@/components/elements/Modal';
+import Modal from '@/components/elements/Modal';
 import { ServerContext } from '@/state/server';
-import { join } from 'path';
 
 type Props = RequiredModalProps & {
     onFileNamed: (name: string) => void;
@@ -17,8 +21,8 @@ interface Values {
 export default ({ onFileNamed, onDismissed, ...props }: Props) => {
     const directory = ServerContext.useStoreState(state => state.files.directory);
 
-    const submit = (values: Values, { setSubmitting }: FormikActions<Values>) => {
-        onFileNamed(join(directory, values.fileName));
+    const submit = (values: Values, { setSubmitting }: FormikHelpers<Values>) => {
+        onFileNamed(join(directory, values.fileName).replace(/^\//, ''));
         setSubmitting(false);
     };
 
@@ -44,12 +48,10 @@ export default ({ onFileNamed, onDismissed, ...props }: Props) => {
                             name={'fileName'}
                             label={'File Name'}
                             description={'Enter the name that this file should be saved as.'}
-                            autoFocus={true}
+                            autoFocus
                         />
-                        <div className={'mt-6 text-right'}>
-                            <button className={'btn btn-primary btn-sm'}>
-                                Create File
-                            </button>
+                        <div css={tw`mt-6 text-right`}>
+                            <Button>Create File</Button>
                         </div>
                     </Form>
                 </Modal>

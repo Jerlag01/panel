@@ -5,7 +5,7 @@ namespace Pterodactyl\Http\Controllers\Api\Client\Servers;
 use Illuminate\Http\Response;
 use Pterodactyl\Models\Server;
 use Pterodactyl\Models\Database;
-use Pterodactyl\Repositories\Eloquent\DatabaseRepository;
+use Pterodactyl\Facades\Activity;
 use Pterodactyl\Services\Databases\DatabasePasswordService;
 use Pterodactyl\Transformers\Api\Client\DatabaseTransformer;
 use Pterodactyl\Services\Databases\DatabaseManagementService;
@@ -19,79 +19,45 @@ use Pterodactyl\Http\Requests\Api\Client\Servers\Databases\RotatePasswordRequest
 class DatabaseController extends ClientApiController
 {
     /**
-     * @var \Pterodactyl\Services\Databases\DeployServerDatabaseService
-     */
-    private $deployDatabaseService;
-
-    /**
-     * @var \Pterodactyl\Repositories\Eloquent\DatabaseRepository
-     */
-    private $repository;
-
-    /**
-     * @var \Pterodactyl\Services\Databases\DatabaseManagementService
-     */
-    private $managementService;
-
-    /**
-     * @var \Pterodactyl\Services\Databases\DatabasePasswordService
-     */
-    private $passwordService;
-
-    /**
      * DatabaseController constructor.
-     *
-     * @param \Pterodactyl\Services\Databases\DatabaseManagementService $managementService
-     * @param \Pterodactyl\Services\Databases\DatabasePasswordService $passwordService
-     * @param \Pterodactyl\Repositories\Eloquent\DatabaseRepository $repository
-     * @param \Pterodactyl\Services\Databases\DeployServerDatabaseService $deployDatabaseService
      */
     public function __construct(
-        DatabaseManagementService $managementService,
-        DatabasePasswordService $passwordService,
-        DatabaseRepository $repository,
-        DeployServerDatabaseService $deployDatabaseService
+        private DeployServerDatabaseService $deployDatabaseService,
+        private DatabaseManagementService $managementService,
+        private DatabasePasswordService $passwordService
     ) {
         parent::__construct();
-
-        $this->deployDatabaseService = $deployDatabaseService;
-        $this->repository = $repository;
-        $this->managementService = $managementService;
-        $this->passwordService = $passwordService;
     }
 
     /**
-     * Return all of the databases that belong to the given server.
-     *
-     * @param \Pterodactyl\Http\Requests\Api\Client\Servers\Databases\GetDatabasesRequest $request
-     * @param \Pterodactyl\Models\Server $server
-     * @return array
+     * Return all the databases that belong to the given server.
      */
     public function index(GetDatabasesRequest $request, Server $server): array
     {
-        $databases = $this->repository->getDatabasesForServer($server->id);
-
-        return $this->fractal->collection($databases)
-            ->transformWith($this->getTransformer(DatabaseTransformer::class))
+        return $this->fractal->collection($server->databases)
+            ->transformWith(DatabaseTransformer::class)
             ->toArray();
     }
 
     /**
      * Create a new database for the given server and return it.
      *
-     * @param \Pterodactyl\Http\Requests\Api\Client\Servers\Databases\StoreDatabaseRequest $request
-     * @param \Pterodactyl\Models\Server $server
-     * @return array
-     *
+     * @throws \Throwable
+     * @throws \Pterodactyl\Exceptions\Service\Database\TooManyDatabasesException
      * @throws \Pterodactyl\Exceptions\Service\Database\DatabaseClientFeatureNotEnabledException
      */
     public function store(StoreDatabaseRequest $request, Server $server): array
     {
         $database = $this->deployDatabaseService->handle($server, $request->validated());
 
+        Activity::event('server:database.create')
+            ->subject($database)
+            ->property('name', $database->database)
+            ->log();
+
         return $this->fractal->item($database)
             ->parseIncludes(['password'])
-            ->transformWith($this->getTransformer(DatabaseTransformer::class))
+            ->transformWith(DatabaseTransformer::class)
             ->toArray();
     }
 
@@ -99,38 +65,38 @@ class DatabaseController extends ClientApiController
      * Rotates the password for the given server model and returns a fresh instance to
      * the caller.
      *
-     * @param \Pterodactyl\Http\Requests\Api\Client\Servers\Databases\RotatePasswordRequest $request
-     * @param \Pterodactyl\Models\Server $server
-     * @param \Pterodactyl\Models\Database $database
-     * @return array
-     *
      * @throws \Throwable
      */
-    public function rotatePassword(RotatePasswordRequest $request, Server $server, Database $database)
+    public function rotatePassword(RotatePasswordRequest $request, Server $server, Database $database): array
     {
         $this->passwordService->handle($database);
         $database->refresh();
 
+        Activity::event('server:database.rotate-password')
+            ->subject($database)
+            ->property('name', $database->database)
+            ->log();
+
         return $this->fractal->item($database)
             ->parseIncludes(['password'])
-            ->transformWith($this->getTransformer(DatabaseTransformer::class))
+            ->transformWith(DatabaseTransformer::class)
             ->toArray();
     }
 
     /**
      * Removes a database from the server.
      *
-     * @param \Pterodactyl\Http\Requests\Api\Client\Servers\Databases\DeleteDatabaseRequest $request
-     * @param \Pterodactyl\Models\Server $server
-     * @param \Pterodactyl\Models\Database $database
-     * @return \Illuminate\Http\Response
-     *
      * @throws \Pterodactyl\Exceptions\Repository\RecordNotFoundException
      */
     public function delete(DeleteDatabaseRequest $request, Server $server, Database $database): Response
     {
-        $this->managementService->delete($database->id);
+        $this->managementService->delete($database);
 
-        return Response::create('', Response::HTTP_NO_CONTENT);
+        Activity::event('server:database.delete')
+            ->subject($database)
+            ->property('name', $database->database)
+            ->log();
+
+        return new Response('', Response::HTTP_NO_CONTENT);
     }
 }

@@ -1,11 +1,5 @@
 <?php
-/**
- * Pterodactyl - Panel
- * Copyright (c) 2015 - 2017 Dane Everitt <dane@daneeveritt.com>.
- *
- * This software is licensed under the terms of the MIT license.
- * https://opensource.org/licenses/MIT
- */
+
 use Illuminate\Database\Migrations\Migration;
 
 class MigrateToNewServiceSystem extends Migration
@@ -13,16 +7,16 @@ class MigrateToNewServiceSystem extends Migration
     /**
      * Run the migrations.
      */
-    public function up()
+    public function up(): void
     {
         DB::transaction(function () {
             $service = DB::table('services')->where('author', config('pterodactyl.service.core'))->where('folder', 'srcds')->first();
-            if (! $service) {
+            if (!$service) {
                 return;
             }
 
             $options = DB::table('service_options')->where('service_id', $service->id)->get();
-            $options->each(function ($item) use ($options) {
+            $options->each(function ($item) {
                 if ($item->tag === 'srcds' && $item->name === 'Insurgency') {
                     $item->tag = 'insurgency';
                 } elseif ($item->tag === 'srcds' && $item->name === 'Team Fortress 2') {
@@ -38,7 +32,7 @@ class MigrateToNewServiceSystem extends Migration
     /**
      * Reverse the migrations.
      */
-    public function down()
+    public function down(): void
     {
         // Not doing reversals right now...
     }

@@ -4,28 +4,21 @@ namespace Pterodactyl\Transformers\Api\Client;
 
 use Pterodactyl\Models\Database;
 use League\Fractal\Resource\Item;
+use Pterodactyl\Models\Permission;
+use League\Fractal\Resource\NullResource;
+use Pterodactyl\Transformers\Api\Transformer;
 use Illuminate\Contracts\Encryption\Encrypter;
 use Pterodactyl\Contracts\Extensions\HashidsInterface;
 
-class DatabaseTransformer extends BaseClientTransformer
+class DatabaseTransformer extends Transformer
 {
-    protected $availableIncludes = ['password'];
+    protected array $availableIncludes = ['password'];
 
-    /**
-     * @var \Illuminate\Contracts\Encryption\Encrypter
-     */
-    private $encrypter;
-
-    /**
-     * @var \Pterodactyl\Contracts\Extensions\HashidsInterface
-     */
-    private $hashids;
+    private Encrypter $encrypter;
+    private HashidsInterface $hashids;
 
     /**
      * Handle dependency injection.
-     *
-     * @param \Illuminate\Contracts\Encryption\Encrypter $encrypter
-     * @param \Pterodactyl\Contracts\Extensions\HashidsInterface $hashids
      */
     public function handle(Encrypter $encrypter, HashidsInterface $hashids)
     {
@@ -33,18 +26,11 @@ class DatabaseTransformer extends BaseClientTransformer
         $this->hashids = $hashids;
     }
 
-    /**
-     * @return string
-     */
     public function getResourceName(): string
     {
         return Database::RESOURCE_NAME;
     }
 
-    /**
-     * @param \Pterodactyl\Models\Database $model
-     * @return array
-     */
     public function transform(Database $model): array
     {
         $model->loadMissing('host');
@@ -52,24 +38,26 @@ class DatabaseTransformer extends BaseClientTransformer
         return [
             'id' => $this->hashids->encode($model->id),
             'host' => [
-                'address' => $model->getRelation('host')->host,
-                'port' => $model->getRelation('host')->port,
+                'address' => $model->host->host,
+                'port' => $model->host->port,
             ],
             'name' => $model->database,
             'username' => $model->username,
             'connections_from' => $model->remote,
+            'max_connections' => $model->max_connections,
         ];
     }
 
     /**
      * Include the database password in the request.
-     *
-     * @param \Pterodactyl\Models\Database $model
-     * @return \League\Fractal\Resource\Item
      */
-    public function includePassword(Database $model): Item
+    public function includePassword(Database $database): Item|NullResource
     {
-        return $this->item($model, function (Database $model) {
+        if ($this->user()->cannot(Permission::ACTION_DATABASE_VIEW_PASSWORD, $database->server)) {
+            return $this->null();
+        }
+
+        return $this->item($database, function (Database $model) {
             return [
                 'password' => $this->encrypter->decrypt($model->password),
             ];

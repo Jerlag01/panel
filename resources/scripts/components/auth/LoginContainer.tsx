@@ -1,143 +1,120 @@
-import React, { useRef } from 'react';
-import { Link, RouteComponentProps } from 'react-router-dom';
-import login, { LoginData } from '@/api/auth/login';
-import LoginFormContainer from '@/components/auth/LoginFormContainer';
-import FlashMessageRender from '@/components/FlashMessageRender';
-import { ActionCreator, Actions, useStoreActions, useStoreState } from 'easy-peasy';
-import { ApplicationStore } from '@/state';
-import { FormikProps, withFormik } from 'formik';
+import { useStoreState } from 'easy-peasy';
+import type { FormikHelpers } from 'formik';
+import { Formik } from 'formik';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import Reaptcha from 'reaptcha';
+import tw from 'twin.macro';
 import { object, string } from 'yup';
-import Field from '@/components/elements/Field';
-import { httpErrorToHuman } from '@/api/http';
-import { FlashMessage } from '@/state/flashes';
-import ReCAPTCHA from 'react-google-recaptcha';
-import Spinner from '@/components/elements/Spinner';
 
-type OwnProps = RouteComponentProps & {
-    clearFlashes: ActionCreator<void>;
-    addFlash: ActionCreator<FlashMessage>;
+import login from '@/api/auth/login';
+import LoginFormContainer from '@/components/auth/LoginFormContainer';
+import Field from '@/components/elements/Field';
+import Button from '@/components/elements/Button';
+import useFlash from '@/plugins/useFlash';
+
+interface Values {
+    username: string;
+    password: string;
 }
 
-const LoginContainer = ({ isSubmitting, setFieldValue, values, submitForm, handleSubmit }: OwnProps & FormikProps<LoginData>) => {
-    const ref = useRef<ReCAPTCHA | null>(null);
-    const { enabled: recaptchaEnabled, siteKey } = useStoreState<ApplicationStore, any>(state => state.settings.data!.recaptcha);
+function LoginContainer() {
+    const ref = useRef<Reaptcha>(null);
+    const [token, setToken] = useState('');
 
-    const submit = (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
+    const { clearFlashes, clearAndAddHttpError } = useFlash();
+    const { enabled: recaptchaEnabled, siteKey } = useStoreState(state => state.settings.data!.recaptcha);
 
-        if (ref.current && !values.recaptchaData) {
-            return ref.current.execute();
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        clearFlashes();
+    }, []);
+
+    const onSubmit = (values: Values, { setSubmitting }: FormikHelpers<Values>) => {
+        clearFlashes();
+
+        // If there is no token in the state yet, request the token and then abort this submit request
+        // since it will be re-submitted when the recaptcha data is returned by the component.
+        if (recaptchaEnabled && !token) {
+            ref.current!.execute().catch(error => {
+                console.error(error);
+
+                setSubmitting(false);
+                clearAndAddHttpError({ error });
+            });
+
+            return;
         }
 
-        handleSubmit(e);
-    };
-
-    return (
-        <React.Fragment>
-            {ref.current && ref.current.render()}
-            <h2 className={'text-center text-neutral-100 font-medium py-4'}>
-                Login to Continue
-            </h2>
-            <FlashMessageRender className={'mb-2'}/>
-            <LoginFormContainer onSubmit={submit}>
-                <label htmlFor={'username'}>Username or Email</label>
-                <Field
-                    type={'text'}
-                    id={'username'}
-                    name={'username'}
-                    className={'input'}
-                />
-                <div className={'mt-6'}>
-                    <label htmlFor={'password'}>Password</label>
-                    <Field
-                        type={'password'}
-                        id={'password'}
-                        name={'password'}
-                        className={'input'}
-                    />
-                </div>
-                <div className={'mt-6'}>
-                    <button
-                        type={'submit'}
-                        className={'btn btn-primary btn-jumbo'}
-                    >
-                        {isSubmitting ?
-                            <Spinner size={'tiny'} className={'mx-auto'}/>
-                            :
-                            'Login'
-                        }
-                    </button>
-                </div>
-                {recaptchaEnabled &&
-                <ReCAPTCHA
-                    ref={ref}
-                    size={'invisible'}
-                    sitekey={siteKey || '_invalid_key'}
-                    onChange={token => {
-                        ref.current && ref.current.reset();
-                        setFieldValue('recaptchaData', token);
-                        submitForm();
-                    }}
-                    onExpired={() => setFieldValue('recaptchaData', null)}
-                />
-                }
-                <div className={'mt-6 text-center'}>
-                    <Link
-                        to={'/auth/password'}
-                        className={'text-xs text-neutral-500 tracking-wide no-underline uppercase hover:text-neutral-600'}
-                    >
-                        Forgot password?
-                    </Link>
-                </div>
-            </LoginFormContainer>
-        </React.Fragment>
-    );
-};
-
-const EnhancedForm = withFormik<OwnProps, LoginData>({
-    displayName: 'LoginContainerForm',
-
-    mapPropsToValues: (props) => ({
-        username: '',
-        password: '',
-        recaptchaData: null,
-    }),
-
-    validationSchema: () => object().shape({
-        username: string().required('A username or email must be provided.'),
-        password: string().required('Please enter your account password.'),
-    }),
-
-    handleSubmit: (values, { props, setFieldValue, setSubmitting }) => {
-        props.clearFlashes();
-        login(values)
+        login({ ...values, recaptchaData: token })
             .then(response => {
                 if (response.complete) {
-                    // @ts-ignore
+                    // @ts-expect-error this is valid
                     window.location = response.intended || '/';
                     return;
                 }
 
-                props.history.replace('/auth/login/checkpoint', { token: response.confirmationToken });
+                navigate('/auth/login/checkpoint', { state: { token: response.confirmationToken } });
             })
             .catch(error => {
                 console.error(error);
 
-                setSubmitting(false);
-                setFieldValue('recaptchaData', null);
-                props.addFlash({ type: 'error', title: 'Error', message: httpErrorToHuman(error) });
-            });
-    },
-})(LoginContainer);
+                setToken('');
+                if (ref.current) ref.current.reset();
 
-export default (props: RouteComponentProps) => {
-    const { clearFlashes, addFlash } = useStoreActions((actions: Actions<ApplicationStore>) => actions.flashes);
+                setSubmitting(false);
+                clearAndAddHttpError({ error });
+            });
+    };
 
     return (
-        <EnhancedForm
-            {...props}
-            addFlash={addFlash}
-            clearFlashes={clearFlashes}
-        />
+        <Formik
+            onSubmit={onSubmit}
+            initialValues={{ username: '', password: '' }}
+            validationSchema={object().shape({
+                username: string().required('A username or email must be provided.'),
+                password: string().required('Please enter your account password.'),
+            })}
+        >
+            {({ isSubmitting, setSubmitting, submitForm }) => (
+                <LoginFormContainer title={'Login to Continue'} css={tw`w-full flex`}>
+                    <Field light type={'text'} label={'Username or Email'} name={'username'} disabled={isSubmitting} />
+                    <div css={tw`mt-6`}>
+                        <Field light type={'password'} label={'Password'} name={'password'} disabled={isSubmitting} />
+                    </div>
+                    <div css={tw`mt-6`}>
+                        <Button type={'submit'} size={'xlarge'} isLoading={isSubmitting} disabled={isSubmitting}>
+                            Login
+                        </Button>
+                    </div>
+                    {recaptchaEnabled && (
+                        <Reaptcha
+                            ref={ref}
+                            size={'invisible'}
+                            sitekey={siteKey || '_invalid_key'}
+                            onVerify={response => {
+                                setToken(response);
+                                submitForm();
+                            }}
+                            onExpire={() => {
+                                setSubmitting(false);
+                                setToken('');
+                            }}
+                        />
+                    )}
+                    <div css={tw`mt-6 text-center`}>
+                        <Link
+                            to={'/auth/password'}
+                            css={tw`text-xs text-neutral-500 tracking-wide no-underline uppercase hover:text-neutral-600`}
+                        >
+                            Forgot password?
+                        </Link>
+                    </div>
+                </LoginFormContainer>
+            )}
+        </Formik>
     );
-};
+}
+
+export default LoginContainer;

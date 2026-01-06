@@ -1,26 +1,73 @@
-import getServer, { Server } from '@/api/server/getServer';
-import { action, Action, createContextStore, thunk, Thunk } from 'easy-peasy';
-import socket, { SocketStore } from './socket';
-import { ServerDatabase } from '@/api/server/getServerDatabases';
-import files, { ServerFileStore } from '@/state/server/files';
-import subusers, { ServerSubuserStore } from '@/state/server/subusers';
-import { composeWithDevTools } from 'redux-devtools-extension';
+import type { Action, Computed, Thunk } from 'easy-peasy';
+import { action, computed, createContextStore, thunk } from 'easy-peasy';
+import isEqual from 'react-fast-compare';
 
-export type ServerStatus = 'offline' | 'starting' | 'stopping' | 'running';
+import type { Server } from '@/api/server/getServer';
+import getServer from '@/api/server/getServer';
+import type { ServerDatabaseStore } from '@/state/server/databases';
+import databases from '@/state/server/databases';
+import type { ServerFileStore } from '@/state/server/files';
+import files from '@/state/server/files';
+import type { ServerScheduleStore } from '@/state/server/schedules';
+import schedules from '@/state/server/schedules';
+import type { SocketStore } from '@/state/server/socket';
+import socket from '@/state/server/socket';
+import type { ServerSubuserStore } from '@/state/server/subusers';
+import subusers from '@/state/server/subusers';
+
+export type ServerStatus = 'offline' | 'starting' | 'stopping' | 'running' | null;
 
 interface ServerDataStore {
     data?: Server;
-    getServer: Thunk<ServerDataStore, string, {}, ServerStore, Promise<void>>;
+    inConflictState: Computed<ServerDataStore, boolean>;
+    isInstalling: Computed<ServerDataStore, boolean>;
+    permissions: string[];
+
+    getServer: Thunk<ServerDataStore, string, Record<string, unknown>, ServerStore, Promise<void>>;
     setServer: Action<ServerDataStore, Server>;
+    setServerFromState: Action<ServerDataStore, (s: Server) => Server>;
+    setPermissions: Action<ServerDataStore, string[]>;
 }
 
 const server: ServerDataStore = {
-    getServer: thunk(async (actions, payload) => {
-        const server = await getServer(payload);
-        actions.setServer(server);
+    permissions: [],
+
+    inConflictState: computed(state => {
+        if (!state.data) {
+            return false;
+        }
+
+        return state.data.status !== null || state.data.isTransferring || state.data.isNodeUnderMaintenance;
     }),
+
+    isInstalling: computed(state => {
+        return state.data?.status === 'installing' || state.data?.status === 'install_failed';
+    }),
+
+    getServer: thunk(async (actions, payload) => {
+        const [server, permissions] = await getServer(payload);
+
+        actions.setServer(server);
+        actions.setPermissions(permissions);
+    }),
+
     setServer: action((state, payload) => {
-        state.data = payload;
+        if (!isEqual(payload, state.data)) {
+            state.data = payload;
+        }
+    }),
+
+    setServerFromState: action((state, payload) => {
+        const output = payload(state.data!);
+        if (!isEqual(output, state.data)) {
+            state.data = output;
+        }
+    }),
+
+    setPermissions: action((state, payload) => {
+        if (!isEqual(payload, state.permissions)) {
+            state.permissions = payload;
+        }
     }),
 };
 
@@ -30,29 +77,9 @@ interface ServerStatusStore {
 }
 
 const status: ServerStatusStore = {
-    value: 'offline',
+    value: null,
     setServerStatus: action((state, payload) => {
         state.value = payload;
-    }),
-};
-
-interface ServerDatabaseStore {
-    items: ServerDatabase[];
-    setDatabases: Action<ServerDatabaseStore, ServerDatabase[]>;
-    appendDatabase: Action<ServerDatabaseStore, ServerDatabase>;
-    removeDatabase: Action<ServerDatabaseStore, ServerDatabase>;
-}
-
-const databases: ServerDatabaseStore = {
-    items: [],
-    setDatabases: action((state, payload) => {
-        state.items = payload;
-    }),
-    appendDatabase: action((state, payload) => {
-        state.items = state.items.filter(item => item.id !== payload.id).concat(payload);
-    }),
-    removeDatabase: action((state, payload) => {
-        state.items = state.items.filter(item => item.id !== payload.id);
     }),
 };
 
@@ -61,6 +88,7 @@ export interface ServerStore {
     subusers: ServerSubuserStore;
     databases: ServerDatabaseStore;
     files: ServerFileStore;
+    schedules: ServerScheduleStore;
     socket: SocketStore;
     status: ServerStatusStore;
     clearServerState: Action<ServerStore>;
@@ -73,13 +101,15 @@ export const ServerContext = createContextStore<ServerStore>({
     databases,
     files,
     subusers,
+    schedules,
     clearServerState: action(state => {
         state.server.data = undefined;
-        state.databases.items = [];
+        state.server.permissions = [];
+        state.databases.data = [];
         state.subusers.data = [];
-
         state.files.directory = '/';
-        state.files.contents = [];
+        state.files.selectedFiles = [];
+        state.schedules.data = [];
 
         if (state.socket.instance) {
             state.socket.instance.removeAllListeners();
@@ -88,10 +118,5 @@ export const ServerContext = createContextStore<ServerStore>({
 
         state.socket.instance = null;
         state.socket.connected = false;
-    }),
-}, {
-    compose: composeWithDevTools({
-        name: 'ServerStore',
-        trace: true,
     }),
 });

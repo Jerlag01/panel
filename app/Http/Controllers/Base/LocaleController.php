@@ -2,42 +2,63 @@
 
 namespace Pterodactyl\Http\Controllers\Base;
 
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Translation\Translator;
+use Illuminate\Contracts\Translation\Loader;
 use Pterodactyl\Http\Controllers\Controller;
+use Pterodactyl\Http\Requests\Base\LocaleRequest;
 
 class LocaleController extends Controller
 {
-    /**
-     * @var \Illuminate\Translation\Translator
-     */
-    private $translator;
+    protected Loader $loader;
 
-    /**
-     * LocaleController constructor.
-     *
-     * @param \Illuminate\Translation\Translator $translator
-     */
     public function __construct(Translator $translator)
     {
-        $this->translator = $translator;
+        $this->loader = $translator->getLoader();
     }
 
     /**
      * Returns translation data given a specific locale and namespace.
-     *
-     * @param \Illuminate\Http\Request $request
-     * @param string $locale
-     * @param string $namespace
-     * @return \Illuminate\Http\JsonResponse
      */
-    public function __invoke(Request $request, string $locale, string $namespace)
+    public function __invoke(LocaleRequest $request): JsonResponse
     {
-        $data = $this->translator->getLoader()->load($locale, str_replace('.', '/', $namespace));
+        $locale = $request->input('locale');
+        $namespace = $request->input('namespace');
+        $response[$locale][$namespace] = $this->i18n($this->loader->load($locale, $namespace));
 
-        return JsonResponse::create($data, 200, [
-            'E-Tag' => md5(json_encode($data)),
+        return new JsonResponse($response, 200, [
+            // Cache this in the browser for an hour, and allow the browser to use a stale
+            // cache for up to a day after it was created while it fetches an updated set
+            // of translation keys.
+            'Cache-Control' => 'public, max-age=3600, stale-while-revalidate=86400',
+            'ETag' => md5(json_encode($response, JSON_THROW_ON_ERROR)),
         ]);
+    }
+
+    /**
+     * Convert standard Laravel translation keys that look like ":foo"
+     * into key structures that are supported by the front-end i18n
+     * library, like "{{foo}}".
+     */
+    protected function i18n(array $data): array
+    {
+        foreach ($data as $key => $value) {
+            if (is_array($value)) {
+                $data[$key] = $this->i18n($value);
+            } else {
+                // Find a Laravel style translation replacement in the string and replace it with
+                // one that the front-end is able to use. This won't always be present, especially
+                // for complex strings or things where we'd never have a backend component anyways.
+                //
+                // For example:
+                // "Hello :name, the :notifications.0.title notification needs :count actions :foo.0.bar."
+                //
+                // Becomes:
+                // "Hello {{name}}, the {{notifications.0.title}} notification needs {{count}} actions {{foo.0.bar}}."
+                $data[$key] = preg_replace('/:([\w.-]+\w)([^\w:]?|$)/m', '{{$1}}$2', $value);
+            }
+        }
+
+        return $data;
     }
 }

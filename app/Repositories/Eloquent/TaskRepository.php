@@ -11,10 +11,8 @@ class TaskRepository extends EloquentRepository implements TaskRepositoryInterfa
 {
     /**
      * Return the model backing this repository.
-     *
-     * @return string
      */
-    public function model()
+    public function model(): string
     {
         return Task::class;
     }
@@ -22,31 +20,25 @@ class TaskRepository extends EloquentRepository implements TaskRepositoryInterfa
     /**
      * Get a task and the server relationship for that task.
      *
-     * @param int $id
-     * @return \Pterodactyl\Models\Task
-     *
      * @throws \Pterodactyl\Exceptions\Repository\RecordNotFoundException
      */
     public function getTaskForJobProcess(int $id): Task
     {
         try {
             return $this->getBuilder()->with('server.user', 'schedule')->findOrFail($id, $this->getColumns());
-        } catch (ModelNotFoundException $exception) {
-            throw new RecordNotFoundException;
+        } catch (ModelNotFoundException) {
+            throw new RecordNotFoundException();
         }
     }
 
     /**
      * Returns the next task in a schedule.
-     *
-     * @param int $schedule
-     * @param int $index
-     * @return null|\Pterodactyl\Models\Task
      */
-    public function getNextTask(int $schedule, int $index)
+    public function getNextTask(int $schedule, int $index): ?Task
     {
         return $this->getBuilder()->where('schedule_id', '=', $schedule)
-            ->where('sequence_id', '=', $index + 1)
+            ->orderBy('sequence_id')
+            ->where('sequence_id', '>', $index)
             ->first($this->getColumns());
     }
 }

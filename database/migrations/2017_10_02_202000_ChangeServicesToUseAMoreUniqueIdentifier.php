@@ -11,7 +11,7 @@ class ChangeServicesToUseAMoreUniqueIdentifier extends Migration
     /**
      * Run the migrations.
      */
-    public function up()
+    public function up(): void
     {
         Schema::table('services', function (Blueprint $table) {
             $table->dropUnique(['name']);
@@ -26,8 +26,8 @@ class ChangeServicesToUseAMoreUniqueIdentifier extends Migration
 
         DB::table('services')->get(['id', 'author', 'uuid'])->each(function ($service) {
             DB::table('services')->where('id', $service->id)->update([
-               'author' => ($service->author === 'ptrdctyl-v040-11e6-8b77-86f30ca893d3') ? 'support@pterodactyl.io' : 'unknown@unknown-author.com',
-               'uuid' => Uuid::uuid4()->toString(),
+                'author' => ($service->author === 'ptrdctyl-v040-11e6-8b77-86f30ca893d3') ? 'support@pterodactyl.io' : 'unknown@unknown-author.com',
+                'uuid' => Uuid::uuid4()->toString(),
             ]);
         });
 
@@ -39,7 +39,7 @@ class ChangeServicesToUseAMoreUniqueIdentifier extends Migration
     /**
      * Reverse the migrations.
      */
-    public function down()
+    public function down(): void
     {
         Schema::table('services', function (Blueprint $table) {
             $table->dropColumn('uuid');

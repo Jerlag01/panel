@@ -2,30 +2,12 @@
 
 namespace Pterodactyl\Http\Requests\Api\Application\Servers;
 
+use Illuminate\Support\Arr;
 use Pterodactyl\Models\Server;
-use Illuminate\Validation\Rule;
-use Pterodactyl\Services\Acl\Api\AdminAcl;
-use Illuminate\Contracts\Validation\Validator;
-use Pterodactyl\Models\Objects\DeploymentObject;
 use Pterodactyl\Http\Requests\Api\Application\ApplicationApiRequest;
 
 class StoreServerRequest extends ApplicationApiRequest
 {
-    /**
-     * @var string
-     */
-    protected $resource = AdminAcl::RESOURCE_SERVERS;
-
-    /**
-     * @var int
-     */
-    protected $permission = AdminAcl::WRITE;
-
-    /**
-     * Rules to be applied to this request.
-     *
-     * @return array
-     */
     public function rules(): array
     {
         $rules = Server::getRules();
@@ -34,127 +16,74 @@ class StoreServerRequest extends ApplicationApiRequest
             'external_id' => $rules['external_id'],
             'name' => $rules['name'],
             'description' => array_merge(['nullable'], $rules['description']),
-            'user' => $rules['owner_id'],
-            'egg' => $rules['egg_id'],
-            'pack' => $rules['pack_id'],
-            'docker_image' => $rules['image'],
-            'startup' => $rules['startup'],
-            'environment' => 'present|array',
-            'skip_scripts' => 'sometimes|boolean',
-            'oom_disabled' => 'sometimes|boolean',
+            'owner_id' => $rules['owner_id'],
+            'node_id' => $rules['node_id'],
 
-            // Resource limitations
             'limits' => 'required|array',
             'limits.memory' => $rules['memory'],
             'limits.swap' => $rules['swap'],
             'limits.disk' => $rules['disk'],
             'limits.io' => $rules['io'],
+            'limits.threads' => $rules['threads'],
             'limits.cpu' => $rules['cpu'],
+            'limits.oom_killer' => 'required|boolean',
 
-            // Application Resource Limits
             'feature_limits' => 'required|array',
-            'feature_limits.databases' => $rules['database_limit'],
             'feature_limits.allocations' => $rules['allocation_limit'],
+            'feature_limits.backups' => $rules['backup_limit'],
+            'feature_limits.databases' => $rules['database_limit'],
 
-            // Placeholders for rules added in withValidator() function.
-            'allocation.default' => '',
-            'allocation.additional.*' => '',
+            'allocation.default' => 'required|bail|integer|exists:allocations,id',
+            'allocation.additional.*' => 'integer|exists:allocations,id',
 
-            // Automatic deployment rules
-            'deploy' => 'sometimes|required|array',
-            'deploy.locations' => 'array',
-            'deploy.locations.*' => 'integer|min:1',
-            'deploy.dedicated_ip' => 'required_with:deploy,boolean',
-            'deploy.port_range' => 'array',
-            'deploy.port_range.*' => 'string',
-
-            'start_on_completion' => 'sometimes|boolean',
+            'startup' => $rules['startup'],
+            'environment' => 'present|array',
+            'egg_id' => $rules['egg_id'],
+            'image' => $rules['image'],
+            'skip_scripts' => 'present|boolean',
         ];
     }
 
     /**
-     * Normalize the data into a format that can be consumed by the service.
+     * @param string|null $key
+     * @param string|array|null $default
      *
      * @return array
      */
-    public function validated()
+    public function validated($key = null, $default = null)
     {
         $data = parent::validated();
 
-        return [
+        $response = [
             'external_id' => array_get($data, 'external_id'),
             'name' => array_get($data, 'name'),
             'description' => array_get($data, 'description'),
-            'owner_id' => array_get($data, 'user'),
-            'egg_id' => array_get($data, 'egg'),
-            'pack_id' => array_get($data, 'pack'),
-            'image' => array_get($data, 'docker_image'),
-            'startup' => array_get($data, 'startup'),
-            'environment' => array_get($data, 'environment'),
+            'owner_id' => array_get($data, 'owner_id'),
+            'node_id' => array_get($data, 'node_id'),
+
             'memory' => array_get($data, 'limits.memory'),
             'swap' => array_get($data, 'limits.swap'),
             'disk' => array_get($data, 'limits.disk'),
             'io' => array_get($data, 'limits.io'),
+            'threads' => array_get($data, 'limits.threads'),
             'cpu' => array_get($data, 'limits.cpu'),
-            'skip_scripts' => array_get($data, 'skip_scripts', false),
+            'oom_killer' => array_get($data, 'limits.oom_killer'),
+
+            'allocation_limit' => array_get($data, 'feature_limits.allocations'),
+            'backup_limit' => array_get($data, 'feature_limits.backups'),
+            'database_limit' => array_get($data, 'feature_limits.databases'),
+
             'allocation_id' => array_get($data, 'allocation.default'),
             'allocation_additional' => array_get($data, 'allocation.additional'),
+
+            'startup' => array_get($data, 'startup'),
+            'environment' => array_get($data, 'environment'),
+            'egg_id' => array_get($data, 'egg_id'),
+            'image' => array_get($data, 'image'),
+            'skip_scripts' => array_get($data, 'skip_scripts'),
             'start_on_completion' => array_get($data, 'start_on_completion', false),
-            'database_limit' => array_get($data, 'feature_limits.databases'),
-            'allocation_limit' => array_get($data, 'feature_limits.allocations'),
         ];
-    }
 
-    /*
-     * Run validation after the rules above have been applied.
-     *
-     * @param \Illuminate\Contracts\Validation\Validator $validator
-     */
-    public function withValidator(Validator $validator)
-    {
-        $validator->sometimes('allocation.default', [
-            'required', 'integer', 'bail',
-            Rule::exists('allocations', 'id')->where(function ($query) {
-                $query->whereNull('server_id');
-            }),
-        ], function ($input) {
-            return ! ($input->deploy);
-        });
-
-        $validator->sometimes('allocation.additional.*', [
-            'integer',
-            Rule::exists('allocations', 'id')->where(function ($query) {
-                $query->whereNull('server_id');
-            }),
-        ], function ($input) {
-            return ! ($input->deploy);
-        });
-
-        $validator->sometimes('deploy.locations', 'present', function ($input) {
-            return $input->deploy;
-        });
-
-        $validator->sometimes('deploy.port_range', 'present', function ($input) {
-            return $input->deploy;
-        });
-    }
-
-    /**
-     * Return a deployment object that can be passed to the server creation service.
-     *
-     * @return \Pterodactyl\Models\Objects\DeploymentObject|null
-     */
-    public function getDeploymentObject()
-    {
-        if (is_null($this->input('deploy'))) {
-            return null;
-        }
-
-        $object = new DeploymentObject;
-        $object->setDedicated($this->input('deploy.dedicated_ip', false));
-        $object->setLocations($this->input('deploy.locations', []));
-        $object->setPorts($this->input('deploy.port_range', []));
-
-        return $object;
+        return is_null($key) ? $response : Arr::get($response, $key, $default);
     }
 }

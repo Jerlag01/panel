@@ -8,12 +8,12 @@ class UpdateOldPermissionsToPointToNewScheduleSystem extends Migration
     /**
      * Run the migrations.
      */
-    public function up()
+    public function up(): void
     {
         $permissions = DB::table('permissions')->where('permission', 'like', '%-task%')->get();
         foreach ($permissions as $record) {
             $parts = explode('-', $record->permission);
-            if (! in_array(array_get($parts, 1), ['tasks', 'task']) || count($parts) !== 2) {
+            if (!in_array(array_get($parts, 1), ['tasks', 'task']) || count($parts) !== 2) {
                 continue;
             }
 
@@ -26,12 +26,12 @@ class UpdateOldPermissionsToPointToNewScheduleSystem extends Migration
     /**
      * Reverse the migrations.
      */
-    public function down()
+    public function down(): void
     {
         $permissions = DB::table('permissions')->where('permission', 'like', '%-schedule%')->get();
         foreach ($permissions as $record) {
             $parts = explode('-', $record->permission);
-            if (! in_array(array_get($parts, 1), ['schedules', 'schedule']) || count($parts) !== 2) {
+            if (!in_array(array_get($parts, 1), ['schedules', 'schedule']) || count($parts) !== 2) {
                 continue;
             }
 

@@ -9,35 +9,17 @@ use Pterodactyl\Contracts\Repository\DatabaseHostRepositoryInterface;
 class HostDeletionService
 {
     /**
-     * @var \Pterodactyl\Contracts\Repository\DatabaseRepositoryInterface
-     */
-    private $databaseRepository;
-
-    /**
-     * @var \Pterodactyl\Contracts\Repository\DatabaseHostRepositoryInterface
-     */
-    private $repository;
-
-    /**
      * HostDeletionService constructor.
-     *
-     * @param \Pterodactyl\Contracts\Repository\DatabaseRepositoryInterface $databaseRepository
-     * @param \Pterodactyl\Contracts\Repository\DatabaseHostRepositoryInterface $repository
      */
     public function __construct(
-        DatabaseRepositoryInterface $databaseRepository,
-        DatabaseHostRepositoryInterface $repository
+        private DatabaseRepositoryInterface $databaseRepository,
+        private DatabaseHostRepositoryInterface $repository
     ) {
-        $this->databaseRepository = $databaseRepository;
-        $this->repository = $repository;
     }
 
     /**
      * Delete a specified host from the Panel if no databases are
      * attached to it.
-     *
-     * @param int $host
-     * @return int
      *
      * @throws \Pterodactyl\Exceptions\Service\HasActiveServersException
      */

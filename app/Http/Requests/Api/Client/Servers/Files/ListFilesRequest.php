@@ -2,25 +2,20 @@
 
 namespace Pterodactyl\Http\Requests\Api\Client\Servers\Files;
 
-use Pterodactyl\Models\Server;
+use Pterodactyl\Models\Permission;
 use Pterodactyl\Http\Requests\Api\Client\ClientApiRequest;
 
 class ListFilesRequest extends ClientApiRequest
 {
     /**
      * Check that the user making this request to the API is authorized to list all
-     * of the files that exist for a given server.
-     *
-     * @return bool
+     * the files that exist for a given server.
      */
-    public function authorize(): bool
+    public function permission(): string
     {
-        return $this->user()->can('file.read', $this->getModel(Server::class));
+        return Permission::ACTION_FILE_READ;
     }
 
-    /**
-     * @return array
-     */
     public function rules(): array
     {
         return [

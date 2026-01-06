@@ -1,23 +1,21 @@
 <?php
 
-namespace Tests\Unit\Http\Middleware;
+namespace Pterodactyl\Tests\Unit\Http\Middleware;
 
 use Mockery as m;
+use Mockery\MockInterface;
 use Illuminate\Auth\AuthManager;
 use Illuminate\Http\RedirectResponse;
 use Pterodactyl\Http\Middleware\RedirectIfAuthenticated;
 
 class RedirectIfAuthenticatedTest extends MiddlewareTestCase
 {
-    /**
-     * @var \Illuminate\Auth\AuthManager|\Mockery\Mock
-     */
-    private $authManager;
+    private MockInterface $authManager;
 
     /**
      * Setup tests.
      */
-    public function setUp()
+    public function setUp(): void
     {
         parent::setUp();
 
@@ -50,8 +48,6 @@ class RedirectIfAuthenticatedTest extends MiddlewareTestCase
 
     /**
      * Return an instance of the middleware using mocked dependencies.
-     *
-     * @return \Pterodactyl\Http\Middleware\RedirectIfAuthenticated
      */
     private function getMiddleware(): RedirectIfAuthenticated
     {

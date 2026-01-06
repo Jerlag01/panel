@@ -7,28 +7,9 @@ use League\Fractal\Serializer\ArraySerializer;
 class PterodactylSerializer extends ArraySerializer
 {
     /**
-     * Serialize an item.
-     *
-     * @param string $resourceKey
-     * @param array $data
-     * @return array
-     */
-    public function item($resourceKey, array $data)
-    {
-        return [
-            'object' => $resourceKey,
-            'attributes' => $data,
-        ];
-    }
-
-    /**
      * Serialize a collection.
-     *
-     * @param string $resourceKey
-     * @param array $data
-     * @return array
      */
-    public function collection($resourceKey, array $data)
+    public function collection(?string $resourceKey, array $data): array
     {
         $response = [];
         foreach ($data as $datum) {
@@ -42,11 +23,20 @@ class PterodactylSerializer extends ArraySerializer
     }
 
     /**
-     * Serialize a null resource.
-     *
-     * @return array
+     * Serialize an item.
      */
-    public function null()
+    public function item(?string $resourceKey, array $data): array
+    {
+        return [
+            'object' => $resourceKey,
+            'attributes' => $data,
+        ];
+    }
+
+    /**
+     * Serialize a null resource.
+     */
+    public function null(): ?array
     {
         return [
             'object' => 'null_resource',
@@ -56,12 +46,8 @@ class PterodactylSerializer extends ArraySerializer
 
     /**
      * Merge the included resources with the parent resource being serialized.
-     *
-     * @param array $transformedData
-     * @param array $includedData
-     * @return array
      */
-    public function mergeIncludes($transformedData, $includedData)
+    public function mergeIncludes(array $transformedData, array $includedData): array
     {
         foreach ($includedData as $key => $datum) {
             $transformedData['relationships'][$key] = $datum;

@@ -8,41 +8,20 @@ use Pterodactyl\Contracts\Repository\ApiKeyRepositoryInterface;
 
 class KeyCreationService
 {
-    /**
-     * @var \Illuminate\Contracts\Encryption\Encrypter
-     */
-    private $encrypter;
-
-    /**
-     * @var int
-     */
-    private $keyType = ApiKey::TYPE_NONE;
-
-    /**
-     * @var \Pterodactyl\Contracts\Repository\ApiKeyRepositoryInterface
-     */
-    private $repository;
+    private int $keyType = ApiKey::TYPE_NONE;
 
     /**
      * ApiKeyService constructor.
-     *
-     * @param \Pterodactyl\Contracts\Repository\ApiKeyRepositoryInterface $repository
-     * @param \Illuminate\Contracts\Encryption\Encrypter $encrypter
      */
-    public function __construct(ApiKeyRepositoryInterface $repository, Encrypter $encrypter)
+    public function __construct(private ApiKeyRepositoryInterface $repository, private Encrypter $encrypter)
     {
-        $this->encrypter = $encrypter;
-        $this->repository = $repository;
     }
 
     /**
      * Set the type of key that should be created. By default an orphaned key will be
      * created. These keys cannot be used for anything, and will not render in the UI.
-     *
-     * @param int $type
-     * @return \Pterodactyl\Services\Api\KeyCreationService
      */
-    public function setKeyType(int $type)
+    public function setKeyType(int $type): self
     {
         $this->keyType = $type;
 
@@ -54,17 +33,13 @@ class KeyCreationService
      * This will automatically generate an identifier and an encrypted token that are
      * stored in the database.
      *
-     * @param array $data
-     * @param array $permissions
-     * @return \Pterodactyl\Models\ApiKey
-     *
      * @throws \Pterodactyl\Exceptions\Model\DataValidationException
      */
     public function handle(array $data, array $permissions = []): ApiKey
     {
         $data = array_merge($data, [
             'key_type' => $this->keyType,
-            'identifier' => str_random(ApiKey::IDENTIFIER_LENGTH),
+            'identifier' => ApiKey::generateTokenIdentifier($this->keyType),
             'token' => $this->encrypter->encrypt(str_random(ApiKey::KEY_LENGTH)),
         ]);
 
@@ -72,8 +47,6 @@ class KeyCreationService
             $data = array_merge($data, $permissions);
         }
 
-        $instance = $this->repository->create($data, true, true);
-
-        return $instance;
+        return $this->repository->create($data, true, true);
     }
 }

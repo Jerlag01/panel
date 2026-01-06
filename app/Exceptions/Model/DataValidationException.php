@@ -2,6 +2,8 @@
 
 namespace Pterodactyl\Exceptions\Model;
 
+use Illuminate\Support\MessageBag;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Contracts\Validation\Validator;
 use Pterodactyl\Exceptions\PterodactylException;
 use Illuminate\Contracts\Support\MessageProvider;
@@ -10,51 +12,48 @@ use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 class DataValidationException extends PterodactylException implements HttpExceptionInterface, MessageProvider
 {
     /**
-     * The validator instance.
-     *
-     * @var \Illuminate\Contracts\Validation\Validator
-     */
-    public $validator;
-
-    /**
      * DataValidationException constructor.
-     *
-     * @param \Illuminate\Contracts\Validation\Validator $validator
      */
-    public function __construct(Validator $validator)
+    public function __construct(protected Validator $validator, protected Model $model)
     {
-        parent::__construct(
-            'Data integrity exception encountered while performing database write operation. ' . $validator->errors()->toJson()
+        $message = sprintf(
+            'Could not save %s[%s]: failed to validate data: %s',
+            get_class($model),
+            $model->getKey(),
+            $validator->errors()->toJson()
         );
 
-        $this->validator = $validator;
+        parent::__construct($message);
     }
 
     /**
      * Return the validator message bag.
-     *
-     * @return \Illuminate\Support\MessageBag
      */
-    public function getMessageBag()
+    public function getMessageBag(): MessageBag
     {
         return $this->validator->errors();
     }
 
     /**
      * Return the status code for this request.
-     *
-     * @return int
      */
-    public function getStatusCode()
+    public function getStatusCode(): int
     {
         return 500;
     }
 
-    /**
-     * @return array
-     */
-    public function getHeaders()
+    public function getHeaders(): array
     {
         return [];
+    }
+
+    public function getValidator(): Validator
+    {
+        return $this->validator;
+    }
+
+    public function getModel(): Model
+    {
+        return $this->model;
     }
 }

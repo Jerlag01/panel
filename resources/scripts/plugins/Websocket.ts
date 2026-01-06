@@ -1,14 +1,13 @@
 import Sockette from 'sockette';
 import { EventEmitter } from 'events';
 
-export const SOCKET_EVENTS = [
-    'SOCKET_OPEN',
-    'SOCKET_RECONNECT',
-    'SOCKET_CLOSE',
-    'SOCKET_ERROR',
-];
-
 export class Websocket extends EventEmitter {
+    // Timer instance for this socket.
+    private timer: any = null;
+
+    // The backoff for the timer, in milliseconds.
+    private backoff = 5000;
+
     // The socket instance being tracked.
     private socket: Sockette | null = null;
 
@@ -20,21 +19,26 @@ export class Websocket extends EventEmitter {
     // refreshed at a pretty continuous interval. The socket server will respond
     // with "token expiring" and "token expired" events when approaching 3 minutes
     // and 0 minutes to expiry.
-    private token: string = '';
+    private token = '';
 
     // Connects to the websocket instance and sets the token for the initial request.
-    connect (url: string): this {
+    connect(url: string): this {
         this.url = url;
+
         this.socket = new Sockette(`${this.url}`, {
             onmessage: e => {
                 try {
-                    let { event, args } = JSON.parse(e.data);
+                    const { event, args } = JSON.parse(e.data);
                     args ? this.emit(event, ...args) : this.emit(event);
                 } catch (ex) {
                     console.warn('Failed to parse incoming websocket message.', ex);
                 }
             },
             onopen: () => {
+                // Clear the timers, we managed to connect just fine.
+                this.timer && clearTimeout(this.timer);
+                this.backoff = 5000;
+
                 this.emit('SOCKET_OPEN');
                 this.authenticate();
             },
@@ -43,20 +47,24 @@ export class Websocket extends EventEmitter {
                 this.authenticate();
             },
             onclose: () => this.emit('SOCKET_CLOSE'),
-            onerror: () => this.emit('SOCKET_ERROR'),
+            onerror: error => this.emit('SOCKET_ERROR', error),
         });
+
+        this.timer = setTimeout(() => {
+            this.backoff = this.backoff + 2500 >= 20000 ? 20000 : this.backoff + 2500;
+            this.socket && this.socket.close();
+            clearTimeout(this.timer);
+
+            // Re-attempt connecting to the socket.
+            this.connect(url);
+        }, this.backoff);
 
         return this;
     }
 
-    // Returns the URL connected to for the socket.
-    getSocketUrl (): string | null {
-        return this.url;
-    }
-
     // Sets the authentication token to use when sending commands back and forth
     // between the websocket instance.
-    setToken (token: string, isUpdate = false): this {
+    setToken(token: string, isUpdate = false): this {
         this.token = token;
 
         if (isUpdate) {
@@ -66,35 +74,33 @@ export class Websocket extends EventEmitter {
         return this;
     }
 
-    // Returns the token being used at the current moment.
-    getToken (): string {
-        return this.token;
-    }
-
-    authenticate () {
+    authenticate() {
         if (this.url && this.token) {
             this.send('auth', this.token);
         }
     }
 
-    close (code?: number, reason?: string) {
+    close(code?: number, reason?: string) {
         this.url = null;
         this.token = '';
         this.socket && this.socket.close(code, reason);
     }
 
-    open () {
+    open() {
         this.socket && this.socket.open();
     }
 
-    reconnect () {
+    reconnect() {
         this.socket && this.socket.reconnect();
     }
 
-    send (event: string, payload?: string | string[]) {
-        this.socket && this.socket.send(JSON.stringify({
-            event,
-            args: Array.isArray(payload) ? payload : [ payload ],
-        }));
+    send(event: string, payload?: string | string[]) {
+        this.socket &&
+            this.socket.send(
+                JSON.stringify({
+                    event,
+                    args: Array.isArray(payload) ? payload : [payload],
+                }),
+            );
     }
 }

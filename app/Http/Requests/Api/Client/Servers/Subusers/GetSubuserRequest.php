@@ -2,17 +2,15 @@
 
 namespace Pterodactyl\Http\Requests\Api\Client\Servers\Subusers;
 
-use Pterodactyl\Http\Requests\Api\Client\ClientApiRequest;
+use Pterodactyl\Models\Permission;
 
-class GetSubuserRequest extends ClientApiRequest
+class GetSubuserRequest extends SubuserRequest
 {
     /**
      * Confirm that a user is able to view subusers for the specified server.
-     *
-     * @return bool
      */
-    public function authorize(): bool
+    public function permission(): string
     {
-        return $this->user()->can('user.read', $this->route()->parameter('server'));
+        return Permission::ACTION_USER_READ;
     }
 }

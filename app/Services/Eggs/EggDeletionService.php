@@ -1,11 +1,4 @@
 <?php
-/**
- * Pterodactyl - Panel
- * Copyright (c) 2015 - 2017 Dane Everitt <dane@daneeveritt.com>.
- *
- * This software is licensed under the terms of the MIT license.
- * https://opensource.org/licenses/MIT
- */
 
 namespace Pterodactyl\Services\Eggs;
 
@@ -17,34 +10,16 @@ use Pterodactyl\Contracts\Repository\ServerRepositoryInterface;
 class EggDeletionService
 {
     /**
-     * @var \Pterodactyl\Contracts\Repository\EggRepositoryInterface
-     */
-    protected $repository;
-
-    /**
-     * @var \Pterodactyl\Contracts\Repository\ServerRepositoryInterface
-     */
-    protected $serverRepository;
-
-    /**
      * EggDeletionService constructor.
-     *
-     * @param \Pterodactyl\Contracts\Repository\ServerRepositoryInterface $serverRepository
-     * @param \Pterodactyl\Contracts\Repository\EggRepositoryInterface $repository
      */
     public function __construct(
-        ServerRepositoryInterface $serverRepository,
-        EggRepositoryInterface $repository
+        protected ServerRepositoryInterface $serverRepository,
+        protected EggRepositoryInterface $repository
     ) {
-        $this->repository = $repository;
-        $this->serverRepository = $serverRepository;
     }
 
     /**
      * Delete an Egg from the database if it has no active servers attached to it.
-     *
-     * @param int $egg
-     * @return int
      *
      * @throws \Pterodactyl\Exceptions\Service\HasActiveServersException
      * @throws \Pterodactyl\Exceptions\Service\Egg\HasChildrenException

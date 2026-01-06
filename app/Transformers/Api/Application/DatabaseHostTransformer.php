@@ -2,24 +2,18 @@
 
 namespace Pterodactyl\Transformers\Api\Application;
 
-use Cake\Chronos\Chronos;
-use Pterodactyl\Models\Database;
 use Pterodactyl\Models\DatabaseHost;
+use League\Fractal\Resource\Collection;
+use League\Fractal\Resource\NullResource;
 use Pterodactyl\Services\Acl\Api\AdminAcl;
+use Pterodactyl\Transformers\Api\Transformer;
 
-class DatabaseHostTransformer extends BaseTransformer
+class DatabaseHostTransformer extends Transformer
 {
-    /**
-     * @var array
-     */
-    protected $availableIncludes = [
-        'databases',
-    ];
+    protected array $availableIncludes = ['databases'];
 
     /**
      * Return the resource name for the JSONAPI output.
-     *
-     * @return string
      */
     public function getResourceName(): string
     {
@@ -28,11 +22,8 @@ class DatabaseHostTransformer extends BaseTransformer
 
     /**
      * Transform database host into a representation for the application API.
-     *
-     * @param \Pterodactyl\Models\DatabaseHost $model
-     * @return array
      */
-    public function transform(DatabaseHost $model)
+    public function transform(DatabaseHost $model): array
     {
         return [
             'id' => $model->id,
@@ -40,31 +31,21 @@ class DatabaseHostTransformer extends BaseTransformer
             'host' => $model->host,
             'port' => $model->port,
             'username' => $model->username,
-            'node' => $model->node_id,
-            'created_at' => Chronos::createFromFormat(Chronos::DEFAULT_TO_STRING_FORMAT, $model->created_at)
-                ->setTimezone(config('app.timezone'))
-                ->toIso8601String(),
-            'updated_at' => Chronos::createFromFormat(Chronos::DEFAULT_TO_STRING_FORMAT, $model->updated_at)
-                ->setTimezone(config('app.timezone'))
-                ->toIso8601String(),
+            'created_at' => self::formatTimestamp($model->created_at),
+            'updated_at' => self::formatTimestamp($model->updated_at),
         ];
     }
 
     /**
      * Include the databases associated with this host.
-     *
-     * @param \Pterodactyl\Models\DatabaseHost $model
-     * @return \League\Fractal\Resource\Collection|\League\Fractal\Resource\NullResource
-     * @throws \Pterodactyl\Exceptions\Transformer\InvalidTransformerLevelException
      */
-    public function includeDatabases(DatabaseHost $model)
+    public function includeDatabases(DatabaseHost $model): Collection|NullResource
     {
-        if (! $this->authorize(AdminAcl::RESOURCE_SERVER_DATABASES)) {
+        if (!$this->authorize(AdminAcl::RESOURCE_SERVER_DATABASES)) {
             return $this->null();
         }
 
-        $model->loadMissing('databases');
-
-        return $this->collection($model->getRelation('databases'), $this->makeTransformer(ServerDatabaseTransformer::class), Database::RESOURCE_NAME);
+        // TODO
+        return $this->collection($model->databases, new ServerDatabaseTransformer());
     }
 }

@@ -10,33 +10,15 @@ use Illuminate\Contracts\Config\Repository as ConfigRepository;
 class NestCreationService
 {
     /**
-     * @var \Illuminate\Contracts\Config\Repository
-     */
-    private $config;
-
-    /**
-     * @var \Pterodactyl\Contracts\Repository\NestRepositoryInterface
-     */
-    private $repository;
-
-    /**
      * NestCreationService constructor.
-     *
-     * @param \Illuminate\Contracts\Config\Repository $config
-     * @param \Pterodactyl\Contracts\Repository\NestRepositoryInterface $repository
      */
-    public function __construct(ConfigRepository $config, NestRepositoryInterface $repository)
+    public function __construct(private ConfigRepository $config, private NestRepositoryInterface $repository)
     {
-        $this->config = $config;
-        $this->repository = $repository;
     }
 
     /**
      * Create a new nest on the system.
      *
-     * @param array $data
-     * @param string|null $author
-     * @return \Pterodactyl\Models\Nest
      * @throws \Pterodactyl\Exceptions\Model\DataValidationException
      */
     public function handle(array $data, string $author = null): Nest

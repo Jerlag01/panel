@@ -12,53 +12,29 @@ use Pterodactyl\Http\Controllers\Api\Application\ApplicationApiController;
 class ServerManagementController extends ApplicationApiController
 {
     /**
-     * @var \Pterodactyl\Services\Servers\ReinstallServerService
-     */
-    private $reinstallServerService;
-
-    /**
-     * @var \Pterodactyl\Services\Servers\SuspensionService
-     */
-    private $suspensionService;
-
-    /**
      * SuspensionController constructor.
-     *
-     * @param \Pterodactyl\Services\Servers\ReinstallServerService $reinstallServerService
-     * @param \Pterodactyl\Services\Servers\SuspensionService $suspensionService
      */
     public function __construct(
-        ReinstallServerService $reinstallServerService,
-        SuspensionService $suspensionService
+        private ReinstallServerService $reinstallServerService,
+        private SuspensionService $suspensionService
     ) {
         parent::__construct();
-
-        $this->reinstallServerService = $reinstallServerService;
-        $this->suspensionService = $suspensionService;
     }
 
     /**
      * Suspend a server on the Panel.
      *
-     * @param \Pterodactyl\Http\Requests\Api\Application\Servers\ServerWriteRequest $request
-     * @param \Pterodactyl\Models\Server $server
-     * @return \Illuminate\Http\Response
-     *
      * @throws \Throwable
      */
     public function suspend(ServerWriteRequest $request, Server $server): Response
     {
-        $this->suspensionService->toggle($server, SuspensionService::ACTION_SUSPEND);
+        $this->suspensionService->toggle($server);
 
         return $this->returnNoContent();
     }
 
     /**
      * Unsuspend a server on the Panel.
-     *
-     * @param \Pterodactyl\Http\Requests\Api\Application\Servers\ServerWriteRequest $request
-     * @param \Pterodactyl\Models\Server $server
-     * @return \Illuminate\Http\Response
      *
      * @throws \Throwable
      */
@@ -72,17 +48,11 @@ class ServerManagementController extends ApplicationApiController
     /**
      * Mark a server as needing to be reinstalled.
      *
-     * @param \Pterodactyl\Http\Requests\Api\Application\Servers\ServerWriteRequest $request
-     * @param \Pterodactyl\Models\Server $server
-     * @return \Illuminate\Http\Response
-     *
-     * @throws \Pterodactyl\Exceptions\DisplayException
-     * @throws \Pterodactyl\Exceptions\Model\DataValidationException
-     * @throws \Pterodactyl\Exceptions\Repository\RecordNotFoundException
+     * @throws \Throwable
      */
     public function reinstall(ServerWriteRequest $request, Server $server): Response
     {
-        $this->reinstallServerService->reinstall($server);
+        $this->reinstallServerService->handle($server);
 
         return $this->returnNoContent();
     }

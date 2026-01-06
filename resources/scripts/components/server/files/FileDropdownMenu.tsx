@@ -1,163 +1,198 @@
-import React, { createRef, useEffect, useState } from 'react';
+import { memo, useRef, useState } from 'react';
+import * as React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faEllipsisH } from '@fortawesome/free-solid-svg-icons/faEllipsisH';
-import { CSSTransition } from 'react-transition-group';
-import { faPencilAlt } from '@fortawesome/free-solid-svg-icons/faPencilAlt';
-import { faTrashAlt } from '@fortawesome/free-solid-svg-icons/faTrashAlt';
-import { faFileDownload } from '@fortawesome/free-solid-svg-icons/faFileDownload';
-import { faCopy } from '@fortawesome/free-solid-svg-icons/faCopy';
-import { faLevelUpAlt } from '@fortawesome/free-solid-svg-icons/faLevelUpAlt';
+import {
+    faBoxOpen,
+    faCopy,
+    faEllipsisH,
+    faFileArchive,
+    faFileCode,
+    faFileDownload,
+    faLevelUpAlt,
+    faPencilAlt,
+    faTrashAlt,
+    IconDefinition,
+} from '@fortawesome/free-solid-svg-icons';
 import RenameFileModal from '@/components/server/files/RenameFileModal';
 import { ServerContext } from '@/state/server';
-import { join } from 'path';
-import deleteFile from '@/api/server/files/deleteFile';
+import { join } from 'pathe';
+import deleteFiles from '@/api/server/files/deleteFiles';
 import SpinnerOverlay from '@/components/elements/SpinnerOverlay';
 import copyFile from '@/api/server/files/copyFile';
-import http, { httpErrorToHuman } from '@/api/http';
+import Can from '@/components/elements/Can';
+import getFileDownloadUrl from '@/api/server/files/getFileDownloadUrl';
+import useFlash from '@/plugins/useFlash';
+import tw from 'twin.macro';
+import { FileObject } from '@/api/server/files/loadDirectory';
+import useFileManagerSwr from '@/plugins/useFileManagerSwr';
+import DropdownMenu from '@/components/elements/DropdownMenu';
+import styled from 'styled-components';
+import useEventListener from '@/plugins/useEventListener';
+import compressFiles from '@/api/server/files/compressFiles';
+import decompressFiles from '@/api/server/files/decompressFiles';
+import isEqual from 'react-fast-compare';
+import ChmodFileModal from '@/components/server/files/ChmodFileModal';
+import { Dialog } from '@/components/elements/dialog';
 
-type ModalType = 'rename' | 'move';
+type ModalType = 'rename' | 'move' | 'chmod';
 
-export default ({ uuid }: { uuid: string }) => {
-    const menu = createRef<HTMLDivElement>();
-    const menuButton = createRef<HTMLDivElement>();
-    const [ menuVisible, setMenuVisible ] = useState(false);
-    const [ showSpinner, setShowSpinner ] = useState(false);
-    const [ modal, setModal ] = useState<ModalType | null>(null);
-    const [ posX, setPosX ] = useState(0);
+const StyledRow = styled.div<{ $danger?: boolean }>`
+    ${tw`p-2 flex items-center rounded`};
+    ${props =>
+        props.$danger ? tw`hover:bg-red-100 hover:text-red-700` : tw`hover:bg-neutral-100 hover:text-neutral-700`};
+`;
 
-    const server = ServerContext.useStoreState(state => state.server.data!);
-    const file = ServerContext.useStoreState(state => state.files.contents.find(file => file.uuid === uuid));
+interface RowProps extends React.HTMLAttributes<HTMLDivElement> {
+    icon: IconDefinition;
+    title: string;
+    $danger?: boolean;
+}
+
+const Row = ({ icon, title, ...props }: RowProps) => (
+    <StyledRow {...props}>
+        <FontAwesomeIcon icon={icon} css={tw`text-xs`} fixedWidth />
+        <span css={tw`ml-2`}>{title}</span>
+    </StyledRow>
+);
+
+const FileDropdownMenu = ({ file }: { file: FileObject }) => {
+    const onClickRef = useRef<DropdownMenu>(null);
+    const [showSpinner, setShowSpinner] = useState(false);
+    const [modal, setModal] = useState<ModalType | null>(null);
+    const [showConfirmation, setShowConfirmation] = useState(false);
+
+    const uuid = ServerContext.useStoreState(state => state.server.data!.uuid);
+    const { mutate } = useFileManagerSwr();
+    const { clearAndAddHttpError, clearFlashes } = useFlash();
     const directory = ServerContext.useStoreState(state => state.files.directory);
-    const { removeFile, getDirectoryContents } = ServerContext.useStoreActions(actions => actions.files);
 
-    if (!file) {
-        return null;
-    }
-
-    const windowListener = (e: MouseEvent) => {
-        if (e.button === 2 || !menuVisible || !menu.current) {
-            return;
+    useEventListener(`pterodactyl:files:ctx:${file.key}`, (e: CustomEvent) => {
+        if (onClickRef.current) {
+            onClickRef.current.triggerMenu(e.detail);
         }
+    });
 
-        if (e.target === menu.current || menu.current.contains(e.target as Node)) {
-            return;
-        }
+    const doDeletion = async () => {
+        clearFlashes('files');
 
-        if (e.target !== menu.current && !menu.current.contains(e.target as Node)) {
-            setMenuVisible(false);
-        }
-    };
+        // For UI speed, immediately remove the file from the listing before calling the deletion function.
+        // If the delete actually fails, we'll fetch the current directory contents again automatically.
+        await mutate(files => files!.filter(f => f.key !== file.key), false);
 
-    const doDeletion = () => {
-        setShowSpinner(true);
-        deleteFile(server.uuid, join(directory, file.name))
-            .then(() => removeFile(uuid))
-            .catch(error => {
-                console.error('Error while attempting to delete a file.', error);
-                setShowSpinner(false);
-            });
+        deleteFiles(uuid, directory, [file.name]).catch(error => {
+            mutate();
+            clearAndAddHttpError({ key: 'files', error });
+        });
     };
 
     const doCopy = () => {
         setShowSpinner(true);
-        copyFile(server.uuid, join(directory, file.name))
-            .then(() => getDirectoryContents(directory))
-            .catch(error => {
-                console.error('Error while attempting to copy file.', error);
-                alert(httpErrorToHuman(error));
-                setShowSpinner(false);
-            });
+        clearFlashes('files');
+
+        copyFile(uuid, join(directory, file.name))
+            .then(() => mutate())
+            .catch(error => clearAndAddHttpError({ key: 'files', error }))
+            .then(() => setShowSpinner(false));
     };
 
     const doDownload = () => {
-        window.location = `/api/client/servers/${server.uuid}/files/download?file=${join(directory, file.name)}` as unknown as Location;
+        setShowSpinner(true);
+        clearFlashes('files');
+
+        getFileDownloadUrl(uuid, join(directory, file.name))
+            .then(url => {
+                // @ts-expect-error this is valid
+                window.location = url;
+            })
+            .catch(error => clearAndAddHttpError({ key: 'files', error }))
+            .then(() => setShowSpinner(false));
     };
 
-    useEffect(() => {
-        menuVisible
-            ? document.addEventListener('click', windowListener)
-            : document.removeEventListener('click', windowListener);
+    const doArchive = () => {
+        setShowSpinner(true);
+        clearFlashes('files');
 
-        if (menuVisible && menu.current) {
-            menu.current.setAttribute(
-                'style', `margin-top: -0.35rem; left: ${Math.round(posX - menu.current.clientWidth)}px`,
-            );
-        }
-    }, [ menuVisible ]);
+        compressFiles(uuid, directory, [file.name])
+            .then(() => mutate())
+            .catch(error => clearAndAddHttpError({ key: 'files', error }))
+            .then(() => setShowSpinner(false));
+    };
 
-    useEffect(() => () => {
-        document.removeEventListener('click', windowListener);
-    }, []);
+    const doUnarchive = () => {
+        setShowSpinner(true);
+        clearFlashes('files');
+
+        decompressFiles(uuid, directory, file.name)
+            .then(() => mutate())
+            .catch(error => clearAndAddHttpError({ key: 'files', error }))
+            .then(() => setShowSpinner(false));
+    };
 
     return (
-        <div key={`dropdown:${file.uuid}`}>
-            <div
-                ref={menuButton}
-                className={'p-3 hover:text-white'}
-                onClick={e => {
-                    e.preventDefault();
-                    if (!menuVisible) {
-                        setPosX(e.clientX);
-                    }
-                    setModal(null);
-                    setMenuVisible(!menuVisible);
-                }}
+        <>
+            <Dialog.Confirm
+                open={showConfirmation}
+                onClose={() => setShowConfirmation(false)}
+                title={`Delete ${file.isFile ? 'File' : 'Directory'}`}
+                confirm={'Delete'}
+                onConfirmed={doDeletion}
             >
-                <FontAwesomeIcon icon={faEllipsisH}/>
-                <RenameFileModal
-                    file={file}
-                    visible={modal === 'rename' || modal === 'move'}
-                    useMoveTerminology={modal === 'move'}
-                    onDismissed={() => {
-                        setModal(null);
-                        setMenuVisible(false);
-                    }}
-                />
-                <SpinnerOverlay visible={showSpinner} fixed={true} size={'large'}/>
-            </div>
-            <CSSTransition timeout={250} in={menuVisible} unmountOnExit={true} classNames={'fade'}>
-                <div
-                    ref={menu}
-                    onClick={e => { e.stopPropagation(); setMenuVisible(false); }}
-                    className={'absolute bg-white p-2 rounded border border-neutral-700 shadow-lg text-neutral-500 min-w-48'}
-                >
-                    <div
-                        onClick={() => setModal('rename')}
-                        className={'hover:text-neutral-700 p-2 flex items-center hover:bg-neutral-100 rounded'}
-                    >
-                        <FontAwesomeIcon icon={faPencilAlt} className={'text-xs'}/>
-                        <span className={'ml-2'}>Rename</span>
+                You will not be able to recover the contents of&nbsp;
+                <span className={'font-semibold text-slate-50'}>{file.name}</span> once deleted.
+            </Dialog.Confirm>
+            <DropdownMenu
+                ref={onClickRef}
+                renderToggle={onClick => (
+                    <div css={tw`px-4 py-2 hover:text-white`} onClick={onClick}>
+                        <FontAwesomeIcon icon={faEllipsisH} />
+                        {modal ? (
+                            modal === 'chmod' ? (
+                                <ChmodFileModal
+                                    visible
+                                    appear
+                                    files={[{ file: file.name, mode: file.modeBits }]}
+                                    onDismissed={() => setModal(null)}
+                                />
+                            ) : (
+                                <RenameFileModal
+                                    visible
+                                    appear
+                                    files={[file.name]}
+                                    useMoveTerminology={modal === 'move'}
+                                    onDismissed={() => setModal(null)}
+                                />
+                            )
+                        ) : null}
+                        <SpinnerOverlay visible={showSpinner} fixed size={'large'} />
                     </div>
-                    <div
-                        onClick={() => setModal('move')}
-                        className={'hover:text-neutral-700 p-2 flex items-center hover:bg-neutral-100 rounded'}
-                    >
-                        <FontAwesomeIcon icon={faLevelUpAlt} className={'text-xs'}/>
-                        <span className={'ml-2'}>Move</span>
-                    </div>
-                    <div
-                        onClick={() => doCopy()}
-                        className={'hover:text-neutral-700 p-2 flex items-center hover:bg-neutral-100 rounded'}
-                    >
-                        <FontAwesomeIcon icon={faCopy} className={'text-xs'}/>
-                        <span className={'ml-2'}>Copy</span>
-                    </div>
-                    <div
-                        className={'hover:text-neutral-700 p-2 flex items-center hover:bg-neutral-100 rounded'}
-                        onClick={() => doDownload()}
-                    >
-                        <FontAwesomeIcon icon={faFileDownload} className={'text-xs'}/>
-                        <span className={'ml-2'}>Download</span>
-                    </div>
-                    <div
-                        onClick={() => doDeletion()}
-                        className={'hover:text-red-700 p-2 flex items-center hover:bg-red-100 rounded'}
-                    >
-                        <FontAwesomeIcon icon={faTrashAlt} className={'text-xs'}/>
-                        <span className={'ml-2'}>Delete</span>
-                    </div>
-                </div>
-            </CSSTransition>
-        </div>
+                )}
+            >
+                <Can action={'file.update'}>
+                    <Row onClick={() => setModal('rename')} icon={faPencilAlt} title={'Rename'} />
+                    <Row onClick={() => setModal('move')} icon={faLevelUpAlt} title={'Move'} />
+                    <Row onClick={() => setModal('chmod')} icon={faFileCode} title={'Permissions'} />
+                </Can>
+                {file.isFile && (
+                    <Can action={'file.create'}>
+                        <Row onClick={doCopy} icon={faCopy} title={'Copy'} />
+                    </Can>
+                )}
+                {file.isArchiveType() ? (
+                    <Can action={'file.create'}>
+                        <Row onClick={doUnarchive} icon={faBoxOpen} title={'Unarchive'} />
+                    </Can>
+                ) : (
+                    <Can action={'file.archive'}>
+                        <Row onClick={doArchive} icon={faFileArchive} title={'Archive'} />
+                    </Can>
+                )}
+                {file.isFile && <Row onClick={doDownload} icon={faFileDownload} title={'Download'} />}
+                <Can action={'file.delete'}>
+                    <Row onClick={() => setShowConfirmation(true)} icon={faTrashAlt} title={'Delete'} $danger />
+                </Can>
+            </DropdownMenu>
+        </>
     );
 };
+
+export default memo(FileDropdownMenu, isEqual);

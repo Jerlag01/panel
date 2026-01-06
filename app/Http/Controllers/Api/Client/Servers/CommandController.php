@@ -4,8 +4,8 @@ namespace Pterodactyl\Http\Controllers\Api\Client\Servers;
 
 use Illuminate\Http\Response;
 use Pterodactyl\Models\Server;
+use Pterodactyl\Facades\Activity;
 use Psr\Http\Message\ResponseInterface;
-use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Exception\BadResponseException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Pterodactyl\Repositories\Wings\DaemonCommandRepository;
@@ -16,28 +16,15 @@ use Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException;
 class CommandController extends ClientApiController
 {
     /**
-     * @var \Pterodactyl\Repositories\Wings\DaemonCommandRepository
-     */
-    private $repository;
-
-    /**
      * CommandController constructor.
-     *
-     * @param \Pterodactyl\Repositories\Wings\DaemonCommandRepository $repository
      */
-    public function __construct(DaemonCommandRepository $repository)
+    public function __construct(private DaemonCommandRepository $repository)
     {
         parent::__construct();
-
-        $this->repository = $repository;
     }
 
     /**
      * Send a command to a running server.
-     *
-     * @param \Pterodactyl\Http\Requests\Api\Client\Servers\SendCommandRequest $request
-     * @param \Pterodactyl\Models\Server $server
-     * @return \Illuminate\Http\Response
      *
      * @throws \Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException
      */
@@ -45,20 +32,22 @@ class CommandController extends ClientApiController
     {
         try {
             $this->repository->setServer($server)->send($request->input('command'));
-        } catch (RequestException $exception) {
-            if ($exception instanceof BadResponseException) {
+        } catch (DaemonConnectionException $exception) {
+            $previous = $exception->getPrevious();
+
+            if ($previous instanceof BadResponseException) {
                 if (
-                    $exception->getResponse() instanceof ResponseInterface
-                    && $exception->getResponse()->getStatusCode() === Response::HTTP_BAD_GATEWAY
+                    $previous->getResponse() instanceof ResponseInterface
+                    && $previous->getResponse()->getStatusCode() === Response::HTTP_BAD_GATEWAY
                 ) {
-                    throw new HttpException(
-                        Response::HTTP_BAD_GATEWAY, 'Server must be online in order to send commands.', $exception
-                    );
+                    throw new HttpException(Response::HTTP_BAD_GATEWAY, 'Server must be online in order to send commands.', $exception);
                 }
             }
 
-            throw new DaemonConnectionException($exception);
+            throw $exception;
         }
+
+        Activity::event('server:console.command')->property('command', $request->input('command'))->log();
 
         return $this->returnNoContent();
     }

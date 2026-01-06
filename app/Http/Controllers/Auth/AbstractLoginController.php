@@ -7,7 +7,9 @@ use Pterodactyl\Models\User;
 use Illuminate\Auth\AuthManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Auth\Events\Failed;
-use Illuminate\Contracts\Config\Repository;
+use Illuminate\Container\Container;
+use Illuminate\Support\Facades\Event;
+use Pterodactyl\Events\Auth\DirectLogin;
 use Pterodactyl\Exceptions\DisplayException;
 use Pterodactyl\Http\Controllers\Controller;
 use Illuminate\Contracts\Auth\Authenticatable;
@@ -17,61 +19,41 @@ abstract class AbstractLoginController extends Controller
 {
     use AuthenticatesUsers;
 
+    protected AuthManager $auth;
+
     /**
      * Lockout time for failed login requests.
-     *
-     * @var int
      */
-    protected $lockoutTime;
+    protected int $lockoutTime;
 
     /**
      * After how many attempts should logins be throttled and locked.
-     *
-     * @var int
      */
-    protected $maxLoginAttempts;
+    protected int $maxLoginAttempts;
 
     /**
      * Where to redirect users after login / registration.
-     *
-     * @var string
      */
-    protected $redirectTo = '/';
-
-    /**
-     * @var \Illuminate\Auth\AuthManager
-     */
-    protected $auth;
-
-    /**
-     * @var \Illuminate\Contracts\Config\Repository
-     */
-    protected $config;
+    protected string $redirectTo = '/';
 
     /**
      * LoginController constructor.
-     *
-     * @param \Illuminate\Auth\AuthManager $auth
-     * @param \Illuminate\Contracts\Config\Repository $config
      */
-    public function __construct(AuthManager $auth, Repository $config)
+    public function __construct()
     {
-        $this->lockoutTime = $config->get('auth.lockout.time');
-        $this->maxLoginAttempts = $config->get('auth.lockout.attempts');
-
-        $this->auth = $auth;
-        $this->config = $config;
+        $this->lockoutTime = config('auth.lockout.time');
+        $this->maxLoginAttempts = config('auth.lockout.attempts');
+        $this->auth = Container::getInstance()->make(AuthManager::class);
     }
 
     /**
      * Get the failed login response instance.
      *
-     * @param \Illuminate\Http\Request $request
-     * @param \Illuminate\Contracts\Auth\Authenticatable|null $user
+     * @return never
      *
-     * @throws \Pterodactyl\Exceptions\DisplayException
+     * @throws DisplayException
      */
-    protected function sendFailedLoginResponse(Request $request, Authenticatable $user = null)
+    protected function sendFailedLoginResponse(Request $request, Authenticatable $user = null, string $message = null)
     {
         $this->incrementLoginAttempts($request);
         $this->fireFailedLoginEvent($user, [
@@ -79,7 +61,7 @@ abstract class AbstractLoginController extends Controller
         ]);
 
         if ($request->route()->named('auth.login-checkpoint')) {
-            throw new DisplayException(trans('auth.two_factor.checkpoint_failed'));
+            throw new DisplayException($message ?? trans('auth.two_factor.checkpoint_failed'));
         }
 
         throw new DisplayException(trans('auth.failed'));
@@ -87,46 +69,40 @@ abstract class AbstractLoginController extends Controller
 
     /**
      * Send the response after the user was authenticated.
-     *
-     * @param \Pterodactyl\Models\User $user
-     * @param \Illuminate\Http\Request $request
-     * @return \Illuminate\Http\JsonResponse
      */
     protected function sendLoginResponse(User $user, Request $request): JsonResponse
     {
+        $request->session()->remove('auth_confirmation_token');
         $request->session()->regenerate();
+
         $this->clearLoginAttempts($request);
 
         $this->auth->guard()->login($user, true);
 
-        return JsonResponse::create([
+        Event::dispatch(new DirectLogin($user, true));
+
+        return new JsonResponse([
             'data' => [
                 'complete' => true,
                 'intended' => $this->redirectPath(),
-                'user' => $user->toVueObject(),
+                'user' => $user->toReactObject(),
             ],
         ]);
     }
 
     /**
-     * Determine if the user is logging in using an email or username,.
-     *
-     * @param string $input
-     * @return string
+     * Determine if the user is logging in using an email or username.
      */
     protected function getField(string $input = null): string
     {
-        return str_contains($input, '@') ? 'email' : 'username';
+        return ($input && str_contains($input, '@')) ? 'email' : 'username';
     }
 
     /**
      * Fire a failed login event.
-     *
-     * @param \Illuminate\Contracts\Auth\Authenticatable|null $user
-     * @param array $credentials
      */
     protected function fireFailedLoginEvent(Authenticatable $user = null, array $credentials = [])
     {
-        event(new Failed('auth', $user, $credentials));
+        Event::dispatch(new Failed('auth', $user, $credentials));
     }
 }

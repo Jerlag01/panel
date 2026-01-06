@@ -1,43 +1,31 @@
 <?php
 
-namespace Tests\Traits;
+namespace Pterodactyl\Tests\Traits;
 
-use Mockery;
+use Mockery\Mock;
 use Mockery\MockInterface;
 use GuzzleHttp\Exception\RequestException;
 
 trait MocksRequestException
 {
-    /**
-     * @var \GuzzleHttp\Exception\RequestException|\Mockery\Mock
-     */
-    private $exception;
+    private RequestException|Mock $exception;
 
-    /**
-     * @var mixed
-     */
-    private $exceptionResponse;
+    private mixed $exceptionResponse;
 
     /**
      * Configure the exception mock to work with the Panel's default exception
      * handler actions.
-     *
-     * @param string $abstract
-     * @param null   $response
      */
-    protected function configureExceptionMock(string $abstract = RequestException::class, $response = null)
+    protected function configureExceptionMock(string $abstract = RequestException::class, $response = null): void
     {
         $this->getExceptionMock($abstract)->shouldReceive('getResponse')->andReturn(value($response));
     }
 
     /**
      * Return a mocked instance of the request exception.
-     *
-     * @param string $abstract
-     * @return \Mockery\MockInterface
      */
     protected function getExceptionMock(string $abstract = RequestException::class): MockInterface
     {
-        return $this->exception ?? $this->exception = Mockery::mock($abstract);
+        return $this->exception ?? $this->exception = \Mockery::mock($abstract);
     }
 }

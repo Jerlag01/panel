@@ -2,83 +2,97 @@
 
 namespace Pterodactyl\Models;
 
-class EggVariable extends Validable
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+/**
+ * @property int $id
+ * @property int $egg_id
+ * @property string $name
+ * @property string $description
+ * @property string $env_variable
+ * @property string $default_value
+ * @property bool $user_viewable
+ * @property bool $user_editable
+ * @property string $rules
+ * @property \Carbon\CarbonImmutable $created_at
+ * @property \Carbon\CarbonImmutable $updated_at
+ * @property bool $required
+ * @property Egg $egg
+ * @property ServerVariable $serverVariables
+ * @property string $field_type
+ *
+ * The "server_value" variable is only present on the object if you've loaded this model
+ * using the server relationship.
+ * @property string|null $server_value
+ */
+class EggVariable extends Model
 {
     /**
      * The resource name for this model when it is transformed into an
      * API representation using fractal.
      */
-    const RESOURCE_NAME = 'egg_variable';
+    public const RESOURCE_NAME = 'egg_variable';
 
     /**
      * Reserved environment variable names.
-     *
-     * @var string
      */
-    const RESERVED_ENV_NAMES = 'SERVER_MEMORY,SERVER_IP,SERVER_PORT,ENV,HOME,USER,STARTUP,SERVER_UUID,UUID';
+    public const RESERVED_ENV_NAMES = 'SERVER_MEMORY,SERVER_IP,SERVER_PORT,ENV,HOME,USER,STARTUP,SERVER_UUID,UUID';
+
+    protected bool $immutableDates = true;
 
     /**
      * The table associated with the model.
-     *
-     * @var string
      */
     protected $table = 'egg_variables';
 
     /**
      * Fields that are not mass assignable.
-     *
-     * @var array
      */
     protected $guarded = ['id', 'created_at', 'updated_at'];
 
     /**
      * Cast values to correct type.
-     *
-     * @var array
      */
     protected $casts = [
         'egg_id' => 'integer',
-        'user_viewable' => 'integer',
-        'user_editable' => 'integer',
+        'user_viewable' => 'bool',
+        'user_editable' => 'bool',
     ];
 
-    /**
-     * @var array
-     */
-    public static $validationRules = [
+    public static array $validationRules = [
         'egg_id' => 'exists:eggs,id',
-        'name' => 'required|string|between:1,255',
+        'name' => 'required|string|between:1,191',
         'description' => 'string',
-        'env_variable' => 'required|regex:/^[\w]{1,255}$/|notIn:' . self::RESERVED_ENV_NAMES,
+        'env_variable' => 'required|regex:/^[\w]{1,191}$/|notIn:' . self::RESERVED_ENV_NAMES,
         'default_value' => 'string',
         'user_viewable' => 'boolean',
         'user_editable' => 'boolean',
         'rules' => 'required|string',
     ];
 
-    /**
-     * @var array
-     */
     protected $attributes = [
         'user_editable' => 0,
         'user_viewable' => 0,
     ];
 
-    /**
-     * @param $value
-     * @return bool
-     */
-    public function getRequiredAttribute($value)
+    public function getRequiredAttribute(): bool
     {
-        return $this->rules === 'required' || str_contains($this->rules, ['required|', '|required']);
+        return in_array('required', explode('|', $this->rules));
+    }
+
+    /**
+     * Returns the egg that this variable belongs to.
+     */
+    public function egg(): BelongsTo
+    {
+        return $this->belongsTo(Egg::class);
     }
 
     /**
      * Return server variables associated with this variable.
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
      */
-    public function serverVariable()
+    public function serverVariables(): HasMany
     {
         return $this->hasMany(ServerVariable::class, 'variable_id');
     }

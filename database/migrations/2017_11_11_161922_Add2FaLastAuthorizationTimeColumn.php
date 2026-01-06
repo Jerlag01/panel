@@ -12,7 +12,7 @@ class Add2FaLastAuthorizationTimeColumn extends Migration
     /**
      * Run the migrations.
      */
-    public function up()
+    public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
             $table->text('totp_secret')->nullable()->change();
@@ -27,7 +27,7 @@ class Add2FaLastAuthorizationTimeColumn extends Migration
 
                 DB::table('users')->where('id', $user->id)->update([
                     'totp_secret' => Crypt::encrypt($user->totp_secret),
-                    'updated_at' => Carbon::now()->toIso8601String(),
+                    'updated_at' => Carbon::now()->toAtomString(),
                 ]);
             });
         });
@@ -36,7 +36,7 @@ class Add2FaLastAuthorizationTimeColumn extends Migration
     /**
      * Reverse the migrations.
      */
-    public function down()
+    public function down(): void
     {
         DB::transaction(function () {
             DB::table('users')->get()->each(function ($user) {
@@ -46,7 +46,7 @@ class Add2FaLastAuthorizationTimeColumn extends Migration
 
                 DB::table('users')->where('id', $user->id)->update([
                     'totp_secret' => Crypt::decrypt($user->totp_secret),
-                    'updated_at' => Carbon::now()->toIso8601String(),
+                    'updated_at' => Carbon::now()->toAtomString(),
                 ]);
             });
         });
